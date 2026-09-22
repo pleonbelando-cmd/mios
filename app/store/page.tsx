@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PRODUCTS } from "@/lib/products";
 import { useAaplxPosition } from "@/hooks/useAaplxPosition";
+import { Coupon } from "@/components/Coupon";
 
 function usd(value: number) {
   return value.toLocaleString("es-ES", {
@@ -17,6 +18,8 @@ export default function StorePage() {
   const { owner, tierResult } = useAaplxPosition();
   const [cart, setCart] = useState<Record<string, number>>({});
   const [purchased, setPurchased] = useState(false);
+  const [couponToken, setCouponToken] = useState<string | null>(null);
+  const [couponStatus, setCouponStatus] = useState<"idle" | "loading" | "error">("idle");
 
   const discountPct = tierResult?.tier?.discountPct ?? 0;
 
@@ -51,6 +54,33 @@ export default function StorePage() {
     });
   }
 
+  async function handleConfirm() {
+    setPurchased(true);
+
+    if (!owner || !tierResult?.tier) {
+      setCouponToken(null);
+      return;
+    }
+
+    setCouponStatus("loading");
+    try {
+      const res = await fetch("/api/coupon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: owner.toBase58(),
+          tierId: tierResult.tier.id,
+        }),
+      });
+      if (!res.ok) throw new Error("no ok");
+      const data = (await res.json()) as { token: string };
+      setCouponToken(data.token);
+      setCouponStatus("idle");
+    } catch {
+      setCouponStatus("error");
+    }
+  }
+
   if (purchased) {
     return (
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-8">
@@ -65,16 +95,38 @@ export default function StorePage() {
             {discountPct}% de descuento aplicado por tu tier. Total cobrado:{" "}
             <span className="font-medium text-zinc-100">{usd(total)}</span>
           </p>
-          <button
-            onClick={() => {
-              setCart({});
-              setPurchased(false);
-            }}
-            className="mt-4 text-xs text-zinc-500 underline hover:text-zinc-300"
-          >
-            Hacer otra compra
-          </button>
         </div>
+
+        {couponStatus === "loading" && (
+          <p className="text-center text-xs text-zinc-500">
+            Firmando cupón…
+          </p>
+        )}
+
+        {couponStatus === "error" && (
+          <p className="text-center text-xs text-red-400">
+            No se pudo generar el cupón verificable.
+          </p>
+        )}
+
+        {couponToken && tierResult?.tier && (
+          <Coupon
+            verifyUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/verify?c=${couponToken}`}
+            discountPct={tierResult.tier.discountPct}
+            tierLabel={tierResult.tier.label}
+          />
+        )}
+
+        <button
+          onClick={() => {
+            setCart({});
+            setPurchased(false);
+            setCouponToken(null);
+          }}
+          className="self-center text-xs text-zinc-500 underline hover:text-zinc-300"
+        >
+          Hacer otra compra
+        </button>
       </div>
     );
   }
@@ -156,7 +208,7 @@ export default function StorePage() {
             <span>{usd(total)}</span>
           </div>
           <button
-            onClick={() => setPurchased(true)}
+            onClick={handleConfirm}
             className="mt-4 w-full rounded-lg bg-violet-600 py-2 text-sm font-medium text-white hover:bg-violet-500"
           >
             Confirmar compra (demo)

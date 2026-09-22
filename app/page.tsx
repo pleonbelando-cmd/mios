@@ -6,6 +6,7 @@ import { WalletPeek } from "@/components/WalletPeek";
 import { PositionCard } from "@/components/PositionCard";
 import { TierMeter } from "@/components/TierMeter";
 import { MarketClock } from "@/components/MarketClock";
+import { PremiumPanel } from "@/components/PremiumPanel";
 import { useActiveOwner } from "@/contexts/ActiveOwnerContext";
 import { useAaplxPosition } from "@/hooks/useAaplxPosition";
 
@@ -20,6 +21,8 @@ export default function Home() {
     marketHours,
     priceSource,
     priceError,
+    price,
+    stockRef,
   } = useAaplxPosition();
 
   return (
@@ -52,6 +55,8 @@ export default function Home() {
       )}
 
       <TierMeter tierResult={tierResult} usdValue={usdValue} />
+
+      <PremiumPanel aaplxPrice={price?.price ?? null} stockRefPrice={stockRef} />
 
       <Link
         href="/store"

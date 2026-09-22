@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MIOS
 
-## Getting Started
+**Beneficios programables para holders de acciones tokenizadas.** Proyecto para el hackathon
+[Stocklana](https://hackathons.solana.com/hackathons/stocklana) (Solana Foundation).
 
-First, run the development server:
+**Demo en vivo:** https://mios-omega.vercel.app
+
+## El problema
+
+Hoy tener acciones y ser cliente de una empresa son dos mundos separados: un holder de Apple no
+obtiene nada como cliente de Apple. Con acciones tokenizadas en Solana ([xStocks](https://xstocks.com/)),
+cualquier comercio puede leer la posición del cliente en su wallet y recompensarla de forma
+automática y verificable — algo que un certificado de acción en papel nunca podría dar.
+
+## Qué hace
+
+1. Conecta tu wallet (Phantom, vía Wallet Standard) — o pega cualquier dirección pública en el
+   modo "ver wallet".
+2. Lee tu balance real de **AAPLx** (Apple xStock, Token-2022) directamente on-chain.
+3. Valora la posición en USD en tiempo real y calcula tu **tier** y % de descuento.
+4. Muestra en vivo que AAPLx cotiza 24/7 mientras la acción real de Apple solo cotiza en horario
+   NYSE (dato de Pyth Network).
+5. En la tienda ficticia **Orchard Store**, aplica tu descuento y emite un **cupón firmado (HMAC)
+   con QR verificable** — escanéalo y `/verify` comprueba la firma en el servidor.
+
+## Por qué Solana
+
+Los tokens de xStocks solo existen en Solana: son SPL (Token-2022) transferibles y componibles, y
+se leen 24/7 desde cualquier app sin permiso del emisor. Eso es lo que hace posible este producto.
+
+## Qué es real y qué es demo
+
+| | |
+|---|---|
+| Balance de AAPLx | **Real.** Lectura on-chain, Token-2022, incluye el ajuste `scaledUiAmount`. |
+| Badge "AAPLx 24/7 / NYSE cerrado" | **Real.** `market_hours` de Pyth Network, sin clave. |
+| Precio de AAPLx en USD | **Real**, vía [Jupiter Price API](https://dev.jup.ag/docs/price-api) (gratis). Pyth Hermes da el mismo dato pero solo con plan de pago (Starter, 500 $/mes) — el código ya está listo para activarlo si algún día hay `PYTH_API_KEY`. |
+| Panel prima/descuento vs AAPL real | **Real**, mismo endpoint de Jupiter. |
+| Cupón con QR | **Real.** Firmado con HMAC-SHA256 server-side, verificable en `/verify`, caduca en 24h. |
+| Marca y tienda ("Orchard Store") | **Ficticias**, a propósito — evita usar marcas reales en la UI. |
+| Checkout | **Maqueta.** No hay pasarela de pago real. |
+
+> Las acciones tokenizadas (xStocks/Ondo) representan exposición económica, no derechos de
+> accionista. No es asesoramiento financiero.
+
+## Stack
+
+Next.js 16 (App Router) · TypeScript · Tailwind v4 · `@solana/web3.js` + `@solana/spl-token`
+(Token-2022) · `@solana/wallet-adapter-react` (Wallet Standard, sin adaptadores explícitos) ·
+Jupiter Price API v3 · Pyth Network (`market_hours`, y Hermes si hay clave) · Vercel.
+
+## Desarrollo local
 
 ```bash
+npm install
+cp .env.local.example .env.local   # rellena NEXT_PUBLIC_SOLANA_RPC_URL (Helius, gratis) y COUPON_SECRET
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`PYTH_API_KEY` es opcional — sin ella, el precio se obtiene igualmente vía Jupiter.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Estructura
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+app/
+  page.tsx          dashboard: wallet, posición, tier, prima/descuento
+  store/page.tsx     Orchard Store: carrito + checkout + cupón
+  verify/page.tsx     verificación del cupón (destino del QR)
+  api/price/route.ts  precio (Jupiter, o Pyth si hay clave) + market_hours
+  api/coupon/route.ts firma del cupón
+lib/
+  holdings.ts   balance de AAPLx on-chain (Token-2022)
+  pyth.ts       cliente Hermes + market_hours
+  jupiter.ts    precio gratuito de AAPLx
+  tiers.ts      motor de tiers/descuentos
+  coupon.ts     firma y verificación HMAC
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Contexto completo del proyecto (decisiones, hallazgos verificados, plan) en [`CLAUDE.md`](./CLAUDE.md).
