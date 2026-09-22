@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "pyth": { "url": "https://mcp.pyth.network/mcp" }
+  }
+}
