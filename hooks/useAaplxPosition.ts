@@ -16,15 +16,18 @@ type MarketHoursReading = {
 
 type PriceReading = {
   price: number;
-  confidence: number;
-  publishTimeMs: number;
+  updatedAtMs: number;
   stale: boolean;
 };
 
+type PriceSource = "pyth" | "jupiter" | "none";
+
 type PriceApiResponse = {
-  configured: boolean;
+  source: PriceSource;
   error?: string;
   aaplx?: PriceReading;
+  /** Referencia del precio de la acción real (solo cuando source=jupiter) */
+  stockRef?: number | null;
   marketHours?: {
     aaplx: MarketHoursReading;
     aaplEquity: MarketHoursReading;
@@ -124,8 +127,9 @@ export function useAaplxPosition() {
     holding: effectiveHolding,
     holdingStatus: effectiveHoldingStatus,
     price: priceData?.aaplx ?? null,
-    priceConfigured: priceData?.configured ?? false,
+    priceSource: priceData?.source ?? "none",
     priceError: priceData?.error ?? null,
+    stockRef: priceData?.stockRef ?? null,
     priceStatus,
     marketHours: priceData?.marketHours ?? null,
     usdValue,

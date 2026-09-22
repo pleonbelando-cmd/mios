@@ -97,14 +97,17 @@ Mostrar un disclaimer claro en la app (ver §11).
 - **@solana/wallet-adapter-react** + **@solana/wallet-adapter-react-ui**. **Sin**
   `@solana/wallet-adapter-wallets`: arrastra WalletConnect/Stellar y su postinstall rompe sin `yarn`
   instalado; Wallet Standard ya autodetecta Phantom sin él (ver §13.1).
-- **@pythnetwork/hermes-client** para precios (ver §7 y §13.3).
-- RPC de Solana: **Helius** (free tier); el RPC público de mainnet va limitado, solo como fallback.
+- **@pythnetwork/hermes-client** para precios, pero solo se usa si hay `PYTH_API_KEY` de pago (ver
+  §7 y §13.3b). **Jupiter Price API v3** (`lib/jupiter.ts`, `fetch` nativo, sin dependencia nueva)
+  es la fuente de precio gratuita por defecto — mismo dato real, sin coste.
+- RPC de Solana: **Helius** (free tier, gratis de verdad, sin tarjeta — verificado); el RPC público
+  de mainnet va limitado, solo como fallback.
 - UI: móvil primero (el track es Consumer). Cuidar el pulido: es un criterio de puntuación.
 
 Variables de entorno (`.env.local`):
 ```
-NEXT_PUBLIC_SOLANA_RPC_URL=   # p.ej. https://mainnet.helius-rpc.com/?api-key=...
-PYTH_API_KEY=                 # ver §7 y §13.3 (Pyth Pro / bounty)
+NEXT_PUBLIC_SOLANA_RPC_URL=   # p.ej. https://mainnet.helius-rpc.com/?api-key=... (Helius, gratis)
+PYTH_API_KEY=                 # OPCIONAL, de pago (§13.3b). Sin ella, precio vía Jupiter (gratis).
 ```
 
 ---
@@ -118,8 +121,10 @@ PYTH_API_KEY=                 # ver §7 y §13.3 (Pyth Pro / bounty)
      TOKEN_2022_PROGRAM_ID })` y filtra por el mint. NO asumas el SPL clásico. Usa siempre
      `tokenAmount.uiAmount` (ya viene escalado por scaledUiAmount, ver §13.1) — nunca calcules a mano
      dividiendo `amount` por `10^decimals`.
-3. **lib/pyth.ts** — obtiene el precio de AAPLx (y opcionalmente de la acción real) vía Hermes (§7, §13.3).
-4. **lib/tiers.ts** — valor USD = balance × precio Pyth. Mapea a tier y % de descuento. Config editable:
+3. **lib/pyth.ts** — precio vía Hermes, solo si hay `PYTH_API_KEY` (§7, §13.3); `market_hours` sin
+   clave para el badge 24/7. **lib/jupiter.ts** — precio de AAPLx gratis vía Jupiter (§13.3b), fuente
+   por defecto. `app/api/price/route.ts` decide cuál usar.
+4. **lib/tiers.ts** — valor USD = balance × precio. Mapea a tier y % de descuento. Config editable:
    ```
    Tier 1: ≥ 500 USD  → 5%
    Tier 2: ≥ 2.000 USD → 10%
@@ -149,15 +154,25 @@ PYTH_API_KEY=                 # ver §7 y §13.3 (Pyth Pro / bounty)
 
 ## 7. Integración de Pyth (pieza central del bounty) — ver §13.3 para lo verificado hoy
 
-- Pyth actualizó su Core el 26/08/2026: **Hermes ahora requiere API key.** Endpoint que SÍ funciona
-  hoy: `https://pyth.dourolabs.app/hermes` (el legacy `hermes.pyth.network` da 401 sin clave).
-- Alta de la clave: `https://pythdata.app/signup` → botón "View your API key". Self-service, free
-  trial incluido.
-- Cliente: `@pythnetwork/hermes-client` v3.1.0 (`HermesClient`, opción `accessToken`).
+⚠️ **CORRECCIÓN 22/09/2026, tarde: Pyth Hermes NO tiene nivel gratuito con acceso API.**
+El plan Free de Pyth Terminal es solo view-only (panel web); la API (lo que necesita este código)
+empieza en el plan **Starter, 500 $/mes**. Verificado contra `app.pyth.com/plans` y en vivo (401 sin
+clave en `hermes.pyth.network` Y en `pyth.dourolabs.app/hermes`). El premio del bounty ("3 meses de
+Pyth Pro") es literalmente eso: un premio para cuando ganas, no acceso durante el hackathon. Por eso:
+
+- **La fuente de precio en vivo por defecto es Jupiter** (`lib/jupiter.ts`, gratis, sin clave, mismo
+  precio DEX real al que se compra/vende AAPLx — ver §13.3b). El código de Pyth (`lib/pyth.ts`) se
+  mantiene completo y listo: si algún día hay `PYTH_API_KEY` (p.ej. al ganar el bounty), el Route
+  Handler (`app/api/price/route.ts`) lo prioriza automáticamente sobre Jupiter.
+- Lo que SÍ es gratis de Pyth y ya está integrado: `/v2/price_feeds` (metadatos + `market_hours`,
+  sin clave) — es lo que alimenta el badge "AAPLx 24/7 / NYSE cerrado" (momento fuerte del pitch,
+  §13.4). Eso sigue siendo Pyth de verdad, así que el bounty ("usar datos de Pyth como pieza
+  central") se mantiene honesto en el pitch: hay que explicarlo así, no ocultarlo.
+- Cliente si algún día hay clave: `@pythnetwork/hermes-client` v3.1.0 (`HermesClient`, opción
+  `accessToken`), endpoint `https://pyth.dourolabs.app/hermes`.
 - **Resolver los feed IDs de la tabla en §13.3** (ya verificados contra la API oficial, no inventarlos).
 - Precio = `price × 10^expo`. Maneja el intervalo de confianza (`conf`) y el caso "sin precio". No hay
-  campo `status`: rechaza por antigüedad de `publish_time`. `/v2/price_feeds` da `market_hours` sin
-  clave — úsalo para el badge de mercado abierto/cerrado (momento fuerte del pitch, ver §13.4).
+  campo `status`: rechaza por antigüedad de `publish_time`.
 
 Config MCP para Claude Code (`.mcp.json`), para que Claude resuelva IDs y precios mientras construye:
 ```json
@@ -258,9 +273,10 @@ claude
 
 ### 13.3 Pyth — endpoint y feed IDs verificados
 - Hermes legacy (`hermes.pyth.network/v2/updates/price/latest`) → **401 sin clave** (confirmado en
-  vivo). Endpoint que funciona: **`https://pyth.dourolabs.app/hermes`**, auth `Authorization: Bearer`
-  o `accessToken` del cliente JS.
-- Alta de clave: `https://pythdata.app/signup` → "View your API key". Self-service, free trial.
+  vivo). `https://pyth.dourolabs.app/hermes` **también da 401 sin clave** (re-verificado 22/09 tarde
+  — corrige lo que decía antes esta misma sección). Auth: `Authorization: Bearer` o `accessToken`
+  del cliente JS, **pero requiere plan de pago** — ver §13.3b, no hay forma gratuita de conseguir
+  una clave que funcione.
 - `@pythnetwork/hermes-client` v3.1.0. El README de GitHub del paquete está desactualizado (endpoint
   viejo sin token) — seguir la doc oficial, no el README. Forzar `export const runtime = "nodejs"`
   en el Route Handler (el paquete depende de `eventsource` + Node 24, no vale Edge).
@@ -270,11 +286,43 @@ claude
   |---|---|
   | `Crypto.AAPLX/USD` | `0x978e6cc68a119ce066aa830017318563a9ed04ec3a0a6439010fc11296a58675` |
   | `Equity.US.AAPL/USD` | `0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688` |
-  | `Equity.Index.AAPL/USD` (24/7) | `0xaaba35e6f33fb973bb2201d48a79ae24795affa6ba8bd50a93dcaf7da0030f36` |
+  | `Equity.Index.AAPL/USD` | `0xaaba35e6f33fb973bb2201d48a79ae24795affa6ba8bd50a93dcaf7da0030f36` |
   | `Crypto.AAPLX/AAPL.RR` (redemption rate) | `0x25babb83691a056fd65f879bfd7197eabd840aae741f69c87ccb31e204a979b2` |
 
+  ⚠️ Corrección: pese al nombre "Index" y a la descripción "24/7" en sus metadatos,
+  `Equity.Index.AAPL/USD` tiene el MISMO `market_hours` que `Equity.US.AAPL/USD` (cerrado fuera de
+  horario NYSE) — comprobado en vivo, no es un feed 24/7. El único feed 24/7 real de los cuatro es
+  `Crypto.AAPLX/USD`. No usar el nombre del símbolo como prueba de su comportamiento — comprobar
+  siempre `market_hours`.
 - `/v2/price_feeds?query=...` responde **sin clave** y devuelve `market_hours: { is_open, next_open,
-  next_close }` — úsalo para el badge de mercado abierto/cerrado.
+  next_close }` — úsalo para el badge de mercado abierto/cerrado. Esto SÍ es gratis y ya está en
+  producción.
+
+### 13.3b Pyth Pro es de pago — Jupiter es la fuente de precio gratuita
+Verificado el 22/09/2026 por la tarde, después de que el usuario preguntara si había que pagar:
+
+- `app.pyth.com/plans`: **Free = view-only en Pyth Terminal (sin API). Starter = 500 $/mes** (acceso
+  API, hasta 1s de frecuencia). Pro desde 2.500 $/mes. No existe un nivel gratuito con clave API que
+  funcione contra Hermes.
+- Se probó también la vía on-chain "gratis" (cuentas `PriceUpdateV2` patrocinadas en shard 0, sin
+  pasar por Hermes): existen para AAPLX y Equity.US.AAPL, pero están **abandonadas** — 238h (10 días)
+  y 927h (39 días) sin actualizar respectivamente, comprobado decodificando `publish_time` on-chain.
+  Como control: SOL/USD en el mismo shard 0 estaba actualizado al segundo. Conclusión: el
+  patrocinio gratuito de Pyth solo cubre pares grandes, no feeds nicho como un xStock. No es una vía
+  aprovechable para este proyecto.
+- **Decisión: `lib/jupiter.ts` usa `https://lite-api.jup.ag/price/v3?ids=<mint>` — gratis, sin
+  clave, confirmado en vivo.** Devuelve `usdPrice` (precio DEX real de AAPLx) y, de regalo,
+  `stockData.price` (referencia del precio de la acción real que usa Jupiter internamente) — eso
+  cubre el panel de prima/descuento de la Fase 3 sin necesitar el feed `AAPL.RR` de Pyth. También
+  devuelve `scaledUiConfig.multiplier` idéntico al que ya leímos on-chain (1,0026642...) — confirma
+  cruzado el hallazgo de §13.1.
+- `app/api/price/route.ts` prioriza Pyth si `PYTH_API_KEY` está configurada (p.ej. al ganar el
+  bounty) y si no, cae a Jupiter automáticamente. El campo `source` en la respuesta ("pyth" |
+  "jupiter" | "none") lo indica; el dashboard lo muestra con transparencia (no ocultarlo — es parte
+  del principio "qué es real vs demo" del propio proyecto, §9).
+- Para el pitch: seguimos usando Pyth de verdad (metadatos + `market_hours` para el badge 24/7), solo
+  el precio USD en sí viene de Jupiter mientras no haya `PYTH_API_KEY`. Explicarlo así con
+  honestidad, no como si fuera 100% Pyth.
 
 ### 13.4 Decisiones de producto que salen de la investigación
 1. El badge "mercado cerrado / AAPLx cotizando 24/7" (con `market_hours`) es el momento fuerte de la

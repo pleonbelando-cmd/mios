@@ -18,7 +18,7 @@ export default function Home() {
     usdValue,
     tierResult,
     marketHours,
-    priceConfigured,
+    priceSource,
     priceError,
   } = useAaplxPosition();
 
@@ -38,11 +38,16 @@ export default function Home() {
         usdValue={usdValue}
       />
 
-      {owner && !priceConfigured && (
+      {owner && priceSource === "jupiter" && (
+        <p className="text-xs text-zinc-500">
+          Precio en vivo vía Jupiter (Pyth Pro requiere plan de pago; se
+          activa solo si configuras PYTH_API_KEY).
+        </p>
+      )}
+
+      {owner && priceSource === "none" && (
         <p className="text-xs text-amber-400">
-          Precio de Pyth sin configurar todavía ({priceError}). El balance sí
-          es real; el valor en USD y el tier aparecerán en cuanto añadas
-          PYTH_API_KEY en .env.local.
+          No se pudo obtener el precio ({priceError}). El balance sí es real.
         </p>
       )}
 
