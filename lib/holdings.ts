@@ -32,18 +32,22 @@ export async function getAaplxHolding(
   });
 
   const mintBase58 = AAPLX_MINT.toBase58();
-  const account = value.find((entry) => {
-    const info = entry.account.data.parsed.info as ParsedTokenAccountInfo;
-    return info.mint === mintBase58;
-  });
+  // La mayoría de wallets (Phantom, etc.) tienen una única ATA por mint, pero
+  // algunas cuentas (bots, custodia, omnibus) reparten el balance en varias
+  // cuentas de token para el mismo mint. Hay que sumarlas todas, no coger
+  // solo la primera — un `.find()` aquí infrarrepresentaría el balance real.
+  const infos = value
+    .map((entry) => entry.account.data.parsed.info as ParsedTokenAccountInfo)
+    .filter((info) => info.mint === mintBase58);
 
-  const info = account?.account.data.parsed.info as
-    | ParsedTokenAccountInfo
-    | undefined;
+  const uiAmount = infos.reduce(
+    (sum, info) => sum + (info.tokenAmount.uiAmount ?? 0),
+    0
+  );
 
   return {
     mint: mintBase58,
-    uiAmount: info?.tokenAmount.uiAmount ?? 0,
-    decimals: info?.tokenAmount.decimals ?? AAPLX_DECIMALS,
+    uiAmount,
+    decimals: infos[0]?.tokenAmount.decimals ?? AAPLX_DECIMALS,
   };
 }
