@@ -337,3 +337,82 @@ Verificado el 22/09/2026 por la tarde, después de que el usuario preguntara si 
 - Antes de tocar convenciones de routing/caching que no estén ya resueltas arriba, lee
   `node_modules/next/dist/docs/` — esta versión tiene cambios respecto a versiones anteriores de
   Next.js (ver `AGENTS.md`, importado al principio de este fichero).
+
+---
+
+## 14. Expansión a marketplace multi-activo (22/09/2026, noche)
+
+El usuario pidió generalizar de "solo AAPLx" a un marketplace real: cualquier xStock que tengas
+desbloquea descuentos en la marca ficticia asociada a esa empresa, con el % dependiendo de cuánto
+tengas de ESA acción en concreto (no del portfolio total). Se amplió a **5 activos**, elegidos y
+verificados on-chain el mismo día (vía Helius, no usar el RPC público para esto — ver §13.2/§15).
+
+### 14.1 Mints verificados (Token-2022, 8 decimales, mismo perfil de extensiones que AAPLx)
+Todos con `ScaledUiAmountConfig` activo (usar `uiAmount`, nunca `amount` crudo) y **sin
+transferHook activo** (`getTransferHook().programId` = System Program = "sin hook"). Nombre y
+símbolo de metadata confirmados on-chain:
+
+| Ticker | Mint | Nombre real | Marca ficticia |
+|---|---|---|---|
+| AAPLx | `XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp` | Apple xStock | Orchard |
+| NVDAx | `Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh` | NVIDIA xStock | Vertex Labs |
+| TSLAx | `XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB` | Tesla xStock | Volt Motors |
+| SPYx | `XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W` | SP500 xStock | Index & Co. |
+| GOOGLx | `XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN` | Alphabet xStock | Compass Digital |
+
+⚠️ Al buscar candidatos en Jupiter (`lite-api.jup.ag/tokens/v2/search?query=<ticker>`) aparecen
+también clones/scam con sufijo `...pump` (6 decimales, sin el prefijo `Xs...`) — **no son los
+xStocks reales de Backed**. El patrón correcto es siempre: prefijo `Xs`, 8 decimales, owner
+program = Token-2022. No añadir un mint nuevo a `lib/assets.ts` sin repetir esta verificación
+completa (metadata name/symbol + Token2022 + transferHook + decimals).
+
+### 14.2 Arquitectura tras la expansión
+- **`lib/assets.ts`** es la única fuente de verdad del catálogo (mint, ticker, decimales, marca,
+  tagline). Añadir un activo = añadir una entrada aquí + productos en `lib/products.ts`.
+- **`lib/holdings.ts`** (`getPortfolioHoldings`) lee TODAS las cuentas Token-2022 del owner en una
+  sola llamada RPC y las agrupa por mint — añadir más activos soportados **no encarece la
+  llamada**, el coste ya estaba pagado leyendo todas las cuentas Token-2022 de la wallet. Suma
+  todas las cuentas que compartan un mismo mint (ver §15: hay wallets con decenas de miles de
+  cuentas para el mismo mint — no coger solo la primera).
+- **`lib/jupiter.ts`** (`getJupiterPrices`) pide los 5 mints en una sola llamada
+  (`ids=mint1,mint2,...`, hasta 50 admitidos). Pyth solo se mantiene para AAPLx (el activo del
+  bounty) si hay `PYTH_API_KEY`; el resto del catálogo usa Jupiter siempre.
+- **`hooks/usePortfolio.ts`** sustituye a `useAaplxPosition.ts` (borrado). Devuelve `positions:
+  AssetPosition[]`, una por cada activo de `SUPPORTED_ASSETS`, cada una con su propio
+  `tierResult` — el tier es **por activo**, no agregado.
+- **Cupón (`lib/coupon.ts`)**: el payload pasó de un tier único a `lines: CouponLine[]`, una línea
+  por cada marca comprada en el checkout (puede haber una línea al 0% si compras de una marca
+  cuya acción no tienes — es honesto, no se oculta). `/verify` y `Coupon.tsx` muestran la lista.
+- **Marketplace (`app/store/page.tsx`)**: una sección por marca con su propio badge de
+  tier/descuento; el carrito mezcla productos de cualquier marca; el descuento se calcula por
+  línea de producto según el tier de SU ticker, no un descuento global.
+
+### 14.3 CLAUDE.md — nota de mantenimiento
+Las secciones anteriores (§2–§13) que hablan de "AAPLx" como si fuera el único activo siguen
+siendo válidas para lo que describen (es el activo del bounty de Pyth, el más documentado), pero
+ya no son la imagen completa del producto — **la fuente de verdad del alcance actual es este
+§14 + el README**, no reescribas las secciones antiguas, solo ten en cuenta que el producto real
+ya es multi-activo.
+
+---
+
+## 15. RPC público: rate limits y wallets "raras" — lecciones operativas
+
+- El RPC público de Solana (`api.mainnet-beta.solana.com`) y sus alternativas gratuitas sin clave
+  (Ankr, PublicNode, OnFinality) empiezan a dar **429/403 con uso sostenido**, incluso esperando
+  minutos entre reintentos — no es un límite corto que se libera solo, es un motivo real para tener
+  RPC propio (Helius, gratis). Antes de rendirte con un método pesado (`getTokenLargestAccounts`),
+  prueba con métodos más ligeros (`getSignaturesForAddress` + `getTransaction`), que suelen seguir
+  permitidos cuando el pesado ya está bloqueado.
+- **No todas las direcciones con balance son wallets "normales".** Antes de usar una dirección como
+  ejemplo de demo, comprueba `getAccountInfo(...).owner` (debe ser
+  `11111111111111111111111111111111`, System Program, para ser una wallet de verdad — un program
+  ID ahí significa que es una cuenta de programa/pool) y **cuántas cuentas de token tiene en
+  total** (`getTokenAccountsByOwner` sin filtrar por mint). Se encontraron direcciones con
+  balance real de AAPLx que resultaron ser cuentas ómnibus con **decenas de miles de cuentas de
+  token** — técnicamente válidas, pero se cargan muy lento en el navegador y no representan una
+  wallet de usuario real. Wallet de demo limpia usada finalmente: `GpPEGdZ2X7LWNDfsE1d5tif9sKfcYWphKY6HCijSPqoM`
+  (3 cuentas Token-2022 en total, System Program).
+- Este mismo hallazgo destapó un bug real en `lib/holdings.ts`: usaba `.find()` (solo la primera
+  cuenta que coincidiera con el mint) en vez de sumar todas — ya corregido. Una wallet puede tener
+  más de una cuenta de token para el mismo mint.

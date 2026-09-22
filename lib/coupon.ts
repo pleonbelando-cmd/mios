@@ -1,10 +1,15 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
+export type CouponLine = {
+  ticker: string;
+  brand: string;
+  tierLabel: string | null;
+  discountPct: number;
+};
+
 export type CouponPayload = {
   wallet: string;
-  tierId: number;
-  tierLabel: string;
-  discountPct: number;
+  lines: CouponLine[];
   timestamp: number; // unix seconds
 };
 

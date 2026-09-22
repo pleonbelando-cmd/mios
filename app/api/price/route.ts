@@ -1,57 +1,59 @@
 import { NextResponse } from "next/server";
 import { AAPLX_FEED_ID, getLatestPrices, getMarketHours } from "@/lib/pyth";
-import { getJupiterAaplxPrice } from "@/lib/jupiter";
+import { getJupiterPrices } from "@/lib/jupiter";
 
 // @pythnetwork/hermes-client depende de `eventsource` y de Node 24; no vale
 // para Edge runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type PriceEntry = {
+  source: "pyth" | "jupiter";
+  price: number;
+  updatedAtMs: number;
+  stale: boolean;
+  stockRef: number | null;
+};
+
 export async function GET() {
-  const [marketHoursAaplx, marketHoursAapl] = await Promise.all([
+  const [marketHoursAaplx, marketHoursAapl, jupiterPrices] = await Promise.all([
     getMarketHours("Crypto.AAPLX/USD"),
     getMarketHours("Equity.US.AAPL/USD"),
+    getJupiterPrices().catch(() => ({})),
   ]);
   const marketHours = { aaplx: marketHoursAaplx, aaplEquity: marketHoursAapl };
 
-  // Pyth Hermes requiere clave de pago (Starter, 500 $/mes) desde el Core
-  // upgrade del 26/08/2026 — no hay nivel gratuito con acceso API. Si algún
-  // día hay clave configurada (p.ej. al ganar el bounty), se usa Pyth de
-  // verdad; si no, se cae a Jupiter (gratis, sin clave, mismo precio DEX
-  // real al que se compra/vende AAPLx).
+  const prices: Record<string, PriceEntry> = {};
+  for (const [ticker, entry] of Object.entries(jupiterPrices)) {
+    prices[ticker] = {
+      source: "jupiter",
+      price: entry.usdPrice,
+      updatedAtMs: entry.updatedAtMs,
+      stale: false,
+      stockRef: entry.stockRefPrice,
+    };
+  }
+
+  // AAPLx es el activo del bounty de Pyth: si hay PYTH_API_KEY de pago
+  // configurada, prioriza el precio real de Hermes sobre Jupiter para ese
+  // activo (el resto del catálogo se queda con Jupiter, gratis).
   if (process.env.PYTH_API_KEY) {
     try {
-      const prices = await getLatestPrices([AAPLX_FEED_ID]);
-      const aaplx = prices[AAPLX_FEED_ID];
+      const pythPrices = await getLatestPrices([AAPLX_FEED_ID]);
+      const aaplx = pythPrices[AAPLX_FEED_ID];
       if (aaplx) {
-        return NextResponse.json({
+        prices.AAPLx = {
           source: "pyth",
-          aaplx: { price: aaplx.price, updatedAtMs: aaplx.publishTimeMs, stale: aaplx.stale },
-          stockRef: null,
-          marketHours,
-        });
+          price: aaplx.price,
+          updatedAtMs: aaplx.publishTimeMs,
+          stale: aaplx.stale,
+          stockRef: prices.AAPLx?.stockRef ?? null,
+        };
       }
     } catch {
-      // cae a Jupiter más abajo
+      // se queda con el precio de Jupiter que ya está en `prices`
     }
   }
 
-  try {
-    const jupiter = await getJupiterAaplxPrice();
-    return NextResponse.json({
-      source: "jupiter",
-      aaplx: { price: jupiter.usdPrice, updatedAtMs: jupiter.updatedAtMs, stale: false },
-      stockRef: jupiter.stockRefPrice,
-      marketHours,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        source: "none",
-        error: error instanceof Error ? error.message : "Error consultando el precio",
-        marketHours,
-      },
-      { status: 502 }
-    );
-  }
+  return NextResponse.json({ prices, marketHours });
 }

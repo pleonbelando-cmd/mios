@@ -1,25 +1,33 @@
 "use client";
 
 import QRCode from "react-qr-code";
+import type { CouponLine } from "@/lib/coupon";
 
 export function Coupon({
   verifyUrl,
-  discountPct,
-  tierLabel,
+  lines,
 }: {
   verifyUrl: string;
-  discountPct: number;
-  tierLabel: string;
+  lines: CouponLine[];
 }) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 text-center">
       <p className="text-xs uppercase tracking-wide text-zinc-500">
         Cupón verificable
       </p>
-      <p className="mt-1 text-2xl font-semibold text-violet-300">
-        {discountPct}% dto.
-      </p>
-      <p className="text-xs text-zinc-500">{tierLabel}</p>
+
+      <div className="mt-2 flex flex-col gap-1">
+        {lines.map((line) => (
+          <p key={line.ticker} className="text-sm text-zinc-300">
+            <span className="font-semibold text-violet-300">
+              {line.discountPct}%
+            </span>{" "}
+            {line.brand}{" "}
+            <span className="text-zinc-500">({line.ticker})</span>
+          </p>
+        ))}
+      </div>
+
       <div className="mx-auto mt-4 w-fit rounded-lg bg-white p-3">
         <QRCode value={verifyUrl} size={160} />
       </div>

@@ -16,12 +16,17 @@ automática y verificable — algo que un certificado de acción en papel nunca 
 
 1. Conecta tu wallet (Phantom, vía Wallet Standard) — o pega cualquier dirección pública en el
    modo "ver wallet".
-2. Lee tu balance real de **AAPLx** (Apple xStock, Token-2022) directamente on-chain.
-3. Valora la posición en USD en tiempo real y calcula tu **tier** y % de descuento.
+2. Lee tu **portfolio real de xStocks** (5 activos: AAPLx, NVDAx, TSLAx, SPYx, GOOGLx —
+   Token-2022) directamente on-chain, en una sola llamada.
+3. Valora cada posición en USD en tiempo real y calcula un **tier y % de descuento por empresa**
+   (más acciones de una empresa = más descuento en su marca, no en las demás).
 4. Muestra en vivo que AAPLx cotiza 24/7 mientras la acción real de Apple solo cotiza en horario
    NYSE (dato de Pyth Network).
-5. En la tienda ficticia **Orchard Store**, aplica tu descuento y emite un **cupón firmado (HMAC)
-   con QR verificable** — escanéalo y `/verify` comprueba la firma en el servidor.
+5. **Marketplace** con una marca ficticia por activo (Orchard/Apple, Vertex Labs/Nvidia, Volt
+   Motors/Tesla, Index & Co./S&P 500, Compass Digital/Alphabet): el carrito puede mezclar
+   productos de varias marcas, cada línea con su propio descuento.
+6. Al confirmar la compra emite un **cupón firmado (HMAC) con QR verificable**, con una línea de
+   descuento por cada marca comprada — escanéalo y `/verify` comprueba la firma en el servidor.
 
 ## Por qué Solana
 
@@ -32,12 +37,12 @@ se leen 24/7 desde cualquier app sin permiso del emisor. Eso es lo que hace posi
 
 | | |
 |---|---|
-| Balance de AAPLx | **Real.** Lectura on-chain, Token-2022, incluye el ajuste `scaledUiAmount`. |
+| Balance de los 5 xStocks | **Real.** Lectura on-chain, Token-2022, incluye el ajuste `scaledUiAmount`. |
 | Badge "AAPLx 24/7 / NYSE cerrado" | **Real.** `market_hours` de Pyth Network, sin clave. |
-| Precio de AAPLx en USD | **Real**, vía [Jupiter Price API](https://dev.jup.ag/docs/price-api) (gratis). Pyth Hermes da el mismo dato pero solo con plan de pago (Starter, 500 $/mes) — el código ya está listo para activarlo si algún día hay `PYTH_API_KEY`. |
-| Panel prima/descuento vs AAPL real | **Real**, mismo endpoint de Jupiter. |
+| Precio de cada activo en USD | **Real**, vía [Jupiter Price API](https://dev.jup.ag/docs/price-api) (gratis, batch de los 5 en una llamada). Pyth Hermes da el mismo dato para AAPLx pero solo con plan de pago (Starter, 500 $/mes) — el código ya está listo para activarlo si algún día hay `PYTH_API_KEY`. |
+| Panel prima/descuento AAPLx vs AAPL real | **Real**, mismo endpoint de Jupiter. |
 | Cupón con QR | **Real.** Firmado con HMAC-SHA256 server-side, verificable en `/verify`, caduca en 24h. |
-| Marca y tienda ("Orchard Store") | **Ficticias**, a propósito — evita usar marcas reales en la UI. |
+| Marcas del marketplace (Orchard, Vertex Labs, Volt Motors, Index & Co., Compass Digital) | **Ficticias**, a propósito — evita usar marcas reales en la UI. |
 | Checkout | **Maqueta.** No hay pasarela de pago real. |
 
 > Las acciones tokenizadas (xStocks/Ondo) representan exposición económica, no derechos de
@@ -63,17 +68,19 @@ npm run dev
 
 ```
 app/
-  page.tsx          dashboard: wallet, posición, tier, prima/descuento
-  store/page.tsx     Orchard Store: carrito + checkout + cupón
-  verify/page.tsx     verificación del cupón (destino del QR)
-  api/price/route.ts  precio (Jupiter, o Pyth si hay clave) + market_hours
-  api/coupon/route.ts firma del cupón
+  page.tsx             dashboard: wallet, portfolio (5 activos), tier por activo, prima/descuento
+  store/page.tsx        marketplace: secciones por marca, carrito multi-activo, checkout, cupón
+  verify/page.tsx        verificación del cupón (destino del QR)
+  api/price/route.ts     precio de los 5 activos (Jupiter, o Pyth para AAPLx si hay clave) + market_hours
+  api/coupon/route.ts    firma del cupón (re-valida tiers server-side)
 lib/
-  holdings.ts   balance de AAPLx on-chain (Token-2022)
-  pyth.ts       cliente Hermes + market_hours
-  jupiter.ts    precio gratuito de AAPLx
-  tiers.ts      motor de tiers/descuentos
-  coupon.ts     firma y verificación HMAC
+  assets.ts     catálogo de xStocks soportados + marca ficticia por activo
+  holdings.ts   balance de los 5 activos on-chain (Token-2022), una sola llamada RPC
+  pyth.ts       cliente Hermes + market_hours (AAPLx)
+  jupiter.ts    precio gratuito de los 5 activos, en batch
+  tiers.ts      motor de tiers/descuentos (mismo config, por activo)
+  products.ts   catálogo del marketplace, un producto ligado a un ticker
+  coupon.ts     firma y verificación HMAC, multi-línea (una por marca comprada)
 ```
 
 Contexto completo del proyecto (decisiones, hallazgos verificados, plan) en [`CLAUDE.md`](./CLAUDE.md).

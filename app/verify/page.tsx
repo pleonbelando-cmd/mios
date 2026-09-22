@@ -40,10 +40,16 @@ function VerifyResult({ token }: { token: string }) {
   return (
     <div className="rounded-xl border border-emerald-800 bg-emerald-950/40 p-5 text-center">
       <p className="text-lg font-semibold text-emerald-300">Cupón válido</p>
-      <p className="mt-2 text-2xl font-semibold text-zinc-50">
-        {payload.discountPct}% dto.
-      </p>
-      <p className="text-xs text-zinc-500">{payload.tierLabel}</p>
+
+      <div className="mt-3 flex flex-col gap-1">
+        {payload.lines.map((line) => (
+          <p key={line.ticker} className="text-sm text-zinc-200">
+            <span className="font-semibold">{line.discountPct}%</span>{" "}
+            {line.brand} <span className="text-zinc-500">({line.ticker})</span>
+          </p>
+        ))}
+      </div>
+
       <p className="mt-3 break-all text-xs text-zinc-500">{payload.wallet}</p>
       <p className="mt-1 text-xs text-zinc-600">
         Emitido:{" "}
