@@ -1,43 +1,19 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import type { PublicKey } from "@solana/web3.js";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { getAaplxHolding, type AaplxHolding } from "@/lib/holdings";
+import type { AaplxHolding } from "@/lib/holdings";
 
 type Status = "idle" | "loading" | "error";
 
-export function PositionCard({ owner }: { owner: PublicKey | null }) {
-  const { connection } = useConnection();
-  const [holding, setHolding] = useState<AaplxHolding | null>(null);
-  const [status, setStatus] = useState<Status>("idle");
-
-  useEffect(() => {
-    if (!owner) {
-      setHolding(null);
-      setStatus("idle");
-      return;
-    }
-
-    let cancelled = false;
-    setStatus("loading");
-
-    getAaplxHolding(connection, owner)
-      .then((result) => {
-        if (cancelled) return;
-        setHolding(result);
-        setStatus("idle");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setStatus("error");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [connection, owner]);
-
+export function PositionCard({
+  owner,
+  holding,
+  status,
+  usdValue,
+}: {
+  owner: PublicKey | null;
+  holding: AaplxHolding | null;
+  status: Status;
+  usdValue: number | null;
+}) {
   if (!owner) {
     return (
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-500">
@@ -65,12 +41,24 @@ export function PositionCard({ owner }: { owner: PublicKey | null }) {
       )}
 
       {status === "idle" && holding && (
-        <p className="mt-3 text-3xl font-semibold text-zinc-50">
-          {holding.uiAmount.toLocaleString("es-ES", {
-            maximumFractionDigits: 6,
-          })}{" "}
-          <span className="text-base font-normal text-zinc-500">AAPLx</span>
-        </p>
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <p className="text-3xl font-semibold text-zinc-50">
+            {holding.uiAmount.toLocaleString("es-ES", {
+              maximumFractionDigits: 6,
+            })}{" "}
+            <span className="text-base font-normal text-zinc-500">AAPLx</span>
+          </p>
+          {usdValue !== null && (
+            <p className="text-sm text-zinc-400">
+              ≈{" "}
+              {usdValue.toLocaleString("es-ES", {
+                style: "currency",
+                currency: "USD",
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

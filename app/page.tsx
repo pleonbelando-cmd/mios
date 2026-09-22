@@ -1,26 +1,59 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { PublicKey } from "@solana/web3.js";
-import { useWallet } from "@solana/wallet-adapter-react";
+import Link from "next/link";
 import { ConnectBar } from "@/components/ConnectBar";
 import { WalletPeek } from "@/components/WalletPeek";
 import { PositionCard } from "@/components/PositionCard";
+import { TierMeter } from "@/components/TierMeter";
+import { MarketClock } from "@/components/MarketClock";
+import { useActiveOwner } from "@/contexts/ActiveOwnerContext";
+import { useAaplxPosition } from "@/hooks/useAaplxPosition";
 
 export default function Home() {
-  const { publicKey } = useWallet();
-  const [peeked, setPeeked] = useState<PublicKey | null>(null);
-
-  const activeOwner = useMemo(
-    () => peeked ?? publicKey,
-    [peeked, publicKey]
-  );
+  const { peeked, setPeeked } = useActiveOwner();
+  const {
+    owner,
+    holding,
+    holdingStatus,
+    usdValue,
+    tierResult,
+    marketHours,
+    priceConfigured,
+    priceError,
+  } = useAaplxPosition();
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-8">
       <ConnectBar />
 
-      <PositionCard owner={activeOwner} />
+      <MarketClock
+        aaplx={marketHours?.aaplx ?? null}
+        aaplEquity={marketHours?.aaplEquity ?? null}
+      />
+
+      <PositionCard
+        owner={owner}
+        holding={holding}
+        status={holdingStatus}
+        usdValue={usdValue}
+      />
+
+      {owner && !priceConfigured && (
+        <p className="text-xs text-amber-400">
+          Precio de Pyth sin configurar todavía ({priceError}). El balance sí
+          es real; el valor en USD y el tier aparecerán en cuanto añadas
+          PYTH_API_KEY en .env.local.
+        </p>
+      )}
+
+      <TierMeter tierResult={tierResult} usdValue={usdValue} />
+
+      <Link
+        href="/store"
+        className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-center text-sm font-medium text-zinc-200 hover:border-violet-600 hover:text-violet-300"
+      >
+        Ir a Orchard Store →
+      </Link>
 
       <WalletPeek onChange={setPeeked} />
 
