@@ -10,7 +10,7 @@ export default async function VerifyPage({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 py-8">
-      <Link href="/" className="text-xs text-zinc-500 underline">
+      <Link href="/" className="text-xs text-zinc-500 underline hover:text-brand-300">
         ← Dashboard
       </Link>
 
@@ -38,14 +38,14 @@ function VerifyResult({ token }: { token: string }) {
   const { payload } = result;
 
   return (
-    <div className="rounded-xl border border-emerald-800 bg-emerald-950/40 p-5 text-center">
-      <p className="text-lg font-semibold text-emerald-300">Cupón válido</p>
+    <div className="rounded-xl border border-solana-green/40 bg-solana-green/10 p-5 text-center">
+      <p className="text-lg font-semibold text-solana-green">Cupón válido</p>
 
       <div className="mt-3 flex flex-col gap-1">
         {payload.lines.map((line) => (
           <p key={line.ticker} className="text-sm text-zinc-200">
             <span className="font-semibold">{line.discountPct}%</span>{" "}
-            {line.brand} <span className="text-zinc-500">({line.ticker})</span>
+            {line.company} <span className="text-zinc-500">({line.ticker})</span>
           </p>
         ))}
       </div>

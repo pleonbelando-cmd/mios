@@ -416,3 +416,68 @@ ya es multi-activo.
 - Este mismo hallazgo destapó un bug real en `lib/holdings.ts`: usaba `.find()` (solo la primera
   cuenta que coincidiera con el mint) en vez de sumar todas — ya corregido. Una wallet puede tener
   más de una cuenta de token para el mismo mint.
+
+---
+
+## 16. Rediseño exchange-style + marcas reales + paleta AIKKIAxSOLANA (23/09/2026)
+
+El usuario pidió tres cosas: (1) dashboard estilo exchange profesional con logo real de
+cada activo al pegar una wallet, (2) marketplace organizado por el nombre **real** de cada
+empresa (Apple, NVIDIA...) en vez de las marcas ficticias de §3/§14, (3) paleta de marca
+AIKKIAxSOLANA. Antes de tocar nada se le avisó explícitamente de que el punto 2 revierte
+la decisión de §3 ("nunca marca real, evita problemas de marca en la entrega") — eligió
+**nombres reales en todo** conscientemente. Esta sección sustituye esa parte de §3/§14: la
+fuente de verdad del naming del marketplace es esta, no lo que digan §3/§14 sobre marcas
+ficticias.
+
+### 16.1 Por qué el logo real no era un impedimento técnico ni legal
+Backed (el emisor de los xStocks) publica el icono oficial de cada token en su propio
+dominio de metadata — verificado en vivo el 23/09/2026:
+`https://xstocks-metadata.backed.fi/logos/tokens/{TICKER}.png` (200 OK para los 5
+activos). Es el mismo logo que muestra cualquier wallet/exchange para ese mint — metadata
+propia del emisor del token, no un asset de marca de terceros "tomado prestado". Por eso
+`lib/assets.ts` guarda `logoUrl` con esa URL literal por activo (no una función que
+reconstruya el patrón, por si Backed cambia el naming de alguno).
+
+### 16.2 Qué cambió y qué mitigación se aplicó
+- `lib/assets.ts`: `brand`/`brandTagline` (ficticios) → `company`/`companyTagline`
+  (reales: Apple, NVIDIA, Tesla, S&P 500, Alphabet) + `logoUrl`. Propagado a
+  `lib/coupon.ts` (`CouponLine.brand` → `.company`), `app/api/coupon/route.ts`,
+  `Coupon.tsx`, `app/verify/page.tsx`.
+- **Mitigación elegida para no cruzar a "merchandising oficial/falsificado"** (un riesgo
+  bastante mayor que mostrar el logo para identificar el activo): `lib/products.ts` usa
+  nombres de producto **genéricos** ("Auriculares inalámbricos", no "iPhone" ni
+  "AirPods") — la empresa real identifica la SECCIÓN (para qué holder es el beneficio),
+  pero el catálogo no pretende ser un producto oficial de esa marca.
+- Disclaimer del footer (`app/layout.tsx`) reforzado: declara explícitamente que MIOS no
+  está afiliado/patrocinado/respaldado por Apple, NVIDIA, Tesla, Alphabet ni S&P Dow
+  Jones Indices, y que la tienda es un concepto de demo, no un comercio oficial.
+- Dashboard (`components/PortfolioList.tsx`, reescrito) ahora es una lista estilo
+  exchange: `TokenIcon` (icono del activo, con fallback a iniciales si la imagen no
+  carga) + ticker/empresa + balance + valor USD + badge de tier, para wallet conectada
+  y para "modo ver wallet". `app/store/page.tsx` usa el mismo `TokenIcon` en la
+  cabecera de cada sección.
+
+### 16.3 Paleta AIKKIAxSOLANA
+Tokens en `app/globals.css` (`@theme inline`), a partir de la guía real de aikkia
+(`C:\aikkia\Imagen de marca\aikkia-tokens.css`, proporción 70% azul · 25% teal · 5%
+ember) + el degradado morado→verde de Solana como acento puntual, no como color base:
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--color-ink` / `-soft` / `-line` | `#0a1628` / `#121f37` / `#1f2d47` | fondo, cards, bordes |
+| `--color-brand-600` (+ 100/300/500/700) | `#1f4bd6` | acción principal (botones, links, wallet button) — sustituye `violet-*` |
+| `--color-teal-400/500` | `#2dd4bf` / `#14b8a6` | badges informativos (tier/descuento) |
+| `--color-ember-400/500` | `#ff9a6b` / `#ff7a45` | **solo cifras en vivo** (precios, valor USD) — regla de aikkia, no usar en texto normal |
+| `--color-solana-purple/green` | `#9945ff` / `#14f195` | acento puntual: badge "Solana", estados de éxito (mercado abierto, cupón válido) — sustituye `emerald-*` |
+
+Tipografías: **Inter** (`--font-inter`, cuerpo) y **Plus Jakarta Sans**
+(`--font-jakarta`, títulos vía clase `font-display`) cargadas con `next/font/google` en
+`app/layout.tsx`, sustituyendo Geist. El isotipo de aikkia vive en
+`public/brand/aikkia-isotipo.svg` (copiado del kit de marca) y se usa en
+`components/ConnectBar.tsx` junto al wordmark "MIOS" y un badge con el degradado
+Solana. El botón de wallet-adapter se restyla vía CSS global (`.wallet-adapter-button`
+en `globals.css`) porque es un componente de la librería, no JSX propio.
+
+**No re-litigar esta sección**: si se plantea "¿no era mejor marca ficticia por el
+riesgo del hackathon?", la respuesta ya está decidida — ver §16 arriba, no §3/§14.

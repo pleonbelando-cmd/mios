@@ -24,14 +24,14 @@ export function PremiumPanel({
   const isPremium = diffPct >= 0;
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+    <div className="rounded-xl border border-ink-line bg-ink-soft p-4">
       <p className="text-xs uppercase tracking-wide text-zinc-500">
         AAPLx vs AAPL real
       </p>
       <div className="mt-2 flex items-baseline justify-between">
         <div>
           <p className="text-xs text-zinc-500">AAPLx (token)</p>
-          <p className="text-lg font-semibold text-zinc-50">{usd(aaplxPrice)}</p>
+          <p className="text-lg font-semibold text-ember-400">{usd(aaplxPrice)}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-zinc-500">AAPL (referencia)</p>
@@ -42,7 +42,7 @@ export function PremiumPanel({
       </div>
       <p
         className={`mt-2 text-sm font-medium ${
-          isPremium ? "text-emerald-400" : "text-amber-400"
+          isPremium ? "text-solana-green" : "text-ember-500"
         }`}
       >
         {isPremium ? "Prima" : "Descuento"} de {Math.abs(diffPct).toFixed(2)}%

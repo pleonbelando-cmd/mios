@@ -17,16 +17,18 @@ automática y verificable — algo que un certificado de acción en papel nunca 
 1. Conecta tu wallet (Phantom, vía Wallet Standard) — o pega cualquier dirección pública en el
    modo "ver wallet".
 2. Lee tu **portfolio real de xStocks** (5 activos: AAPLx, NVDAx, TSLAx, SPYx, GOOGLx —
-   Token-2022) directamente on-chain, en una sola llamada.
+   Token-2022) directamente on-chain, en una sola llamada, y lo muestra estilo exchange: logo
+   oficial de cada activo, balance y valor en USD.
 3. Valora cada posición en USD en tiempo real y calcula un **tier y % de descuento por empresa**
-   (más acciones de una empresa = más descuento en su marca, no en las demás).
+   (más acciones de una empresa = más descuento en su sección, no en las demás).
 4. Muestra en vivo que AAPLx cotiza 24/7 mientras la acción real de Apple solo cotiza en horario
    NYSE (dato de Pyth Network).
-5. **Marketplace** con una marca ficticia por activo (Orchard/Apple, Vertex Labs/Nvidia, Volt
-   Motors/Tesla, Index & Co./S&P 500, Compass Digital/Alphabet): el carrito puede mezclar
-   productos de varias marcas, cada línea con su propio descuento.
+5. **Marketplace** organizado por la empresa real de cada activo (Apple, NVIDIA, Tesla, S&P 500,
+   Alphabet — con su logo oficial): el carrito puede mezclar productos de varias secciones, cada
+   línea con su propio descuento. Los productos son genéricos (no réplicas de productos oficiales
+   de cada marca) — ver disclaimer.
 6. Al confirmar la compra emite un **cupón firmado (HMAC) con QR verificable**, con una línea de
-   descuento por cada marca comprada — escanéalo y `/verify` comprueba la firma en el servidor.
+   descuento por cada empresa comprada — escanéalo y `/verify` comprueba la firma en el servidor.
 
 ## Por qué Solana
 
@@ -42,11 +44,13 @@ se leen 24/7 desde cualquier app sin permiso del emisor. Eso es lo que hace posi
 | Precio de cada activo en USD | **Real**, vía [Jupiter Price API](https://dev.jup.ag/docs/price-api) (gratis, batch de los 5 en una llamada). Pyth Hermes da el mismo dato para AAPLx pero solo con plan de pago (Starter, 500 $/mes) — el código ya está listo para activarlo si algún día hay `PYTH_API_KEY`. |
 | Panel prima/descuento AAPLx vs AAPL real | **Real**, mismo endpoint de Jupiter. |
 | Cupón con QR | **Real.** Firmado con HMAC-SHA256 server-side, verificable en `/verify`, caduca en 24h. |
-| Marcas del marketplace (Orchard, Vertex Labs, Volt Motors, Index & Co., Compass Digital) | **Ficticias**, a propósito — evita usar marcas reales en la UI. |
+| Logo de cada empresa (Apple, NVIDIA, Tesla, S&P 500, Alphabet) | **Real** — icono oficial del xStock publicado por Backed (el emisor del token), mismo dato que muestra cualquier wallet/exchange. |
+| Productos del marketplace | **Genéricos**, a propósito — no son réplicas de productos oficiales de cada marca, solo agrupados por la empresa real que da el descuento. |
 | Checkout | **Maqueta.** No hay pasarela de pago real. |
 
 > Las acciones tokenizadas (xStocks/Ondo) representan exposición económica, no derechos de
-> accionista. No es asesoramiento financiero.
+> accionista. MIOS no está afiliado, patrocinado ni respaldado por Apple, NVIDIA, Tesla, Alphabet
+> ni S&P Dow Jones Indices. No es asesoramiento financiero.
 
 ## Stack
 
@@ -74,7 +78,7 @@ app/
   api/price/route.ts     precio de los 5 activos (Jupiter, o Pyth para AAPLx si hay clave) + market_hours
   api/coupon/route.ts    firma del cupón (re-valida tiers server-side)
 lib/
-  assets.ts     catálogo de xStocks soportados + marca ficticia por activo
+  assets.ts     catálogo de xStocks soportados + empresa real y logo por activo
   holdings.ts   balance de los 5 activos on-chain (Token-2022), una sola llamada RPC
   pyth.ts       cliente Hermes + market_hours (AAPLx)
   jupiter.ts    precio gratuito de los 5 activos, en batch

@@ -8,33 +8,35 @@ export type Product = {
 };
 
 /**
- * Marcas y productos ficticios a propósito (CLAUDE.md §3): las acciones
- * tokenizadas verificadas son reales, las marcas que premian a sus holders
- * son un mockup — una por cada activo de lib/assets.ts.
+ * Catálogo de demo del marketplace, agrupado por empresa real (lib/assets.ts,
+ * ver CLAUDE.md §16). Los productos en sí son accesorios genéricos — no
+ * réplicas de productos oficiales de cada compañía — para que quede claro
+ * que es un beneficio de fidelidad para holders, no una tienda oficial de
+ * Apple/NVIDIA/Tesla/etc.
  */
 export const PRODUCTS: Product[] = [
-  // Orchard — AAPLx
-  { id: "orchard-1", ticker: "AAPLx", name: "Auriculares Orchard One", priceUsd: 89, blurb: "Cancelación de ruido, 30h de batería." },
-  { id: "orchard-2", ticker: "AAPLx", name: "Funda Orchard Slim", priceUsd: 29, blurb: "Piel vegana, ajuste magnético." },
-  { id: "orchard-3", ticker: "AAPLx", name: "Cargador Orchard Fast 65W", priceUsd: 45, blurb: "Carga completa en 40 minutos." },
+  // Apple — AAPLx
+  { id: "aaplx-1", ticker: "AAPLx", name: "Auriculares inalámbricos", priceUsd: 89, blurb: "Cancelación de ruido, 30h de batería." },
+  { id: "aaplx-2", ticker: "AAPLx", name: "Funda protectora", priceUsd: 29, blurb: "Piel vegana, ajuste magnético." },
+  { id: "aaplx-3", ticker: "AAPLx", name: "Cargador rápido 65W", priceUsd: 45, blurb: "Carga completa en 40 minutos." },
 
-  // Vertex Labs — NVDAx
-  { id: "vertex-1", ticker: "NVDAx", name: "Monitor Vertex RT 4K", priceUsd: 429, blurb: "144Hz, HDR, ideal para renderizado." },
-  { id: "vertex-2", ticker: "NVDAx", name: "Base de refrigeración Vertex Chill", priceUsd: 39, blurb: "Para portátiles de alto rendimiento." },
-  { id: "vertex-3", ticker: "NVDAx", name: "Vertex Render Credits (pack)", priceUsd: 59, blurb: "Horas de renderizado en la nube." },
+  // NVIDIA — NVDAx
+  { id: "nvdax-1", ticker: "NVDAx", name: "Monitor 4K 144Hz", priceUsd: 429, blurb: "HDR, ideal para renderizado." },
+  { id: "nvdax-2", ticker: "NVDAx", name: "Base de refrigeración", priceUsd: 39, blurb: "Para portátiles de alto rendimiento." },
+  { id: "nvdax-3", ticker: "NVDAx", name: "Créditos de renderizado en la nube", priceUsd: 59, blurb: "Pack de horas de cómputo GPU." },
 
-  // Volt Motors — TSLAx
-  { id: "volt-1", ticker: "TSLAx", name: "Cargador portátil Volt Fast", priceUsd: 79, blurb: "Carga rápida para el día a día." },
-  { id: "volt-2", ticker: "TSLAx", name: "Kit de limpieza Volt Shine", priceUsd: 25, blurb: "Cuidado exterior e interior." },
-  { id: "volt-3", ticker: "TSLAx", name: "Llavero Volt", priceUsd: 15, blurb: "Edición holder." },
+  // Tesla — TSLAx
+  { id: "tslax-1", ticker: "TSLAx", name: "Cargador portátil rápido", priceUsd: 79, blurb: "Carga rápida para el día a día." },
+  { id: "tslax-2", ticker: "TSLAx", name: "Kit de limpieza para el coche", priceUsd: 25, blurb: "Cuidado exterior e interior." },
+  { id: "tslax-3", ticker: "TSLAx", name: "Llavero edición holder", priceUsd: 15, blurb: "Edición limitada para holders." },
 
-  // Index & Co. — SPYx
-  { id: "index-1", ticker: "SPYx", name: "Cartera de piel Index", priceUsd: 55, blurb: "Diseño minimalista." },
-  { id: "index-2", ticker: "SPYx", name: "Agenda Index Planner", priceUsd: 22, blurb: "Planificación financiera anual." },
-  { id: "index-3", ticker: "SPYx", name: "Index+ (newsletter anual)", priceUsd: 40, blurb: "Análisis de mercado semanal." },
+  // S&P 500 — SPYx
+  { id: "spyx-1", ticker: "SPYx", name: "Cartera de piel", priceUsd: 55, blurb: "Diseño minimalista." },
+  { id: "spyx-2", ticker: "SPYx", name: "Agenda de planificación financiera", priceUsd: 22, blurb: "Planificación financiera anual." },
+  { id: "spyx-3", ticker: "SPYx", name: "Newsletter de mercado (anual)", priceUsd: 40, blurb: "Análisis de mercado semanal." },
 
-  // Compass Digital — GOOGLx
-  { id: "compass-1", ticker: "GOOGLx", name: "Compass Nav (GPS de viaje)", priceUsd: 65, blurb: "Navegación offline global." },
-  { id: "compass-2", ticker: "GOOGLx", name: "Auriculares Compass Clear", priceUsd: 49, blurb: "Traducción en tiempo real." },
-  { id: "compass-3", ticker: "GOOGLx", name: "Compass Cloud (1 año)", priceUsd: 35, blurb: "Almacenamiento y backup." },
+  // Alphabet — GOOGLx
+  { id: "googlx-1", ticker: "GOOGLx", name: "GPS de viaje offline", priceUsd: 65, blurb: "Navegación offline global." },
+  { id: "googlx-2", ticker: "GOOGLx", name: "Auriculares con traducción", priceUsd: 49, blurb: "Traducción en tiempo real." },
+  { id: "googlx-3", ticker: "GOOGLx", name: "Almacenamiento en la nube (1 año)", priceUsd: 35, blurb: "Almacenamiento y backup." },
 ];

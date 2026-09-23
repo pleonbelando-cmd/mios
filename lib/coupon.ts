@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 export type CouponLine = {
   ticker: string;
-  brand: string;
+  company: string;
   tierLabel: string | null;
   discountPct: number;
 };

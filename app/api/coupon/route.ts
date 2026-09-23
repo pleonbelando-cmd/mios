@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const tier = TIERS.find((t) => t.id === raw.tierId);
     couponLines.push({
       ticker: asset.ticker,
-      brand: asset.brand,
+      company: asset.company,
       tierLabel: tier?.label ?? null,
       discountPct: tier?.discountPct ?? 0,
     });

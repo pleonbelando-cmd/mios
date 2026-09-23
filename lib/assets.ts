@@ -7,10 +7,14 @@ export type AssetConfig = {
   decimals: number;
   /** Nombre real del xStock (metadata on-chain) */
   displayName: string;
-  /** Marca FICTICIA que "premia" a los holders de este activo — nunca una
-   * marca real, por los mismos motivos que Orchard para AAPLx (ver CLAUDE.md §3). */
-  brand: string;
-  brandTagline: string;
+  /** Empresa/índice real que representa el activo — ver CLAUDE.md §16:
+   * decisión consciente (23/09/2026) de mostrar nombre y logo reales. */
+  company: string;
+  companyTagline: string;
+  /** Icono oficial del token, publicado por Backed (el emisor del xStock) en
+   * su propio dominio de metadata — el mismo logo que muestra cualquier
+   * wallet o exchange para este mint. No es un asset de marca de terceros. */
+  logoUrl: string;
 };
 
 /**
@@ -26,40 +30,45 @@ export const SUPPORTED_ASSETS: AssetConfig[] = [
     mint: new PublicKey("XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp"),
     decimals: 8,
     displayName: "Apple xStock",
-    brand: "Orchard",
-    brandTagline: "Auriculares, fundas y accesorios",
+    company: "Apple",
+    companyTagline: "Tecnología y dispositivos personales",
+    logoUrl: "https://xstocks-metadata.backed.fi/logos/tokens/AAPLx.png",
   },
   {
     ticker: "NVDAx",
     mint: new PublicKey("Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"),
     decimals: 8,
     displayName: "NVIDIA xStock",
-    brand: "Vertex Labs",
-    brandTagline: "Periféricos y renderizado en la nube",
+    company: "NVIDIA",
+    companyTagline: "Computación gráfica e inteligencia artificial",
+    logoUrl: "https://xstocks-metadata.backed.fi/logos/tokens/NVDAx.png",
   },
   {
     ticker: "TSLAx",
     mint: new PublicKey("XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB"),
     decimals: 8,
     displayName: "Tesla xStock",
-    brand: "Volt Motors",
-    brandTagline: "Movilidad eléctrica y accesorios de carga",
+    company: "Tesla",
+    companyTagline: "Movilidad eléctrica y energía",
+    logoUrl: "https://xstocks-metadata.backed.fi/logos/tokens/TSLAx.png",
   },
   {
     ticker: "SPYx",
     mint: new PublicKey("XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W"),
     decimals: 8,
     displayName: "SP500 xStock",
-    brand: "Index & Co.",
-    brandTagline: "Artículos de vida financiera diversificada",
+    company: "S&P 500",
+    companyTagline: "Cesta diversificada de las 500 mayores empresas de EE. UU.",
+    logoUrl: "https://xstocks-metadata.backed.fi/logos/tokens/SPYx.png",
   },
   {
     ticker: "GOOGLx",
     mint: new PublicKey("XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN"),
     decimals: 8,
     displayName: "Alphabet xStock",
-    brand: "Compass Digital",
-    brandTagline: "Navegación, nube y accesorios de viaje",
+    company: "Alphabet",
+    companyTagline: "Búsqueda, nube e inteligencia artificial",
+    logoUrl: "https://xstocks-metadata.backed.fi/logos/tokens/GOOGLx.png",
   },
 ];
 

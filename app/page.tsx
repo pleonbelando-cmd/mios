@@ -26,10 +26,10 @@ export default function Home() {
       />
 
       {!owner && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-500">
+        <div className="rounded-xl border border-ink-line bg-ink-soft p-4 text-sm text-zinc-500">
           Conecta una wallet o usa el modo &quot;ver wallet&quot; para ver tu
           portfolio de acciones tokenizadas y los descuentos que desbloquea
-          en cada marca.
+          en cada empresa.
         </div>
       )}
 
@@ -53,7 +53,7 @@ export default function Home() {
 
       <Link
         href="/store"
-        className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-center text-sm font-medium text-zinc-200 hover:border-violet-600 hover:text-violet-300"
+        className="rounded-lg border border-ink-line bg-ink-soft px-4 py-3 text-center text-sm font-medium text-zinc-200 hover:border-brand-600 hover:text-brand-300"
       >
         Ir al marketplace →
       </Link>

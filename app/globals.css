@@ -1,19 +1,85 @@
 @import "tailwindcss";
 
+/* ============================================================
+   AIKKIA × SOLANA — tokens de marca del proyecto MIOS.
+   Base: paleta de aikkia (azul/teal/ember sobre tinta oscura,
+   ver C:\aikkia\Imagen de marca\aikkia-tokens.css) + el degradado
+   morado→verde de Solana como acento puntual. Ver CLAUDE.md §16.
+   ============================================================ */
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  --background: #0a1628;
+  --foreground: #f4f6fb;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-jakarta);
+
+  /* Tinta — fondos y bordes */
+  --color-ink: #0a1628;
+  --color-ink-soft: #121f37;
+  --color-ink-line: #1f2d47;
+
+  /* Azul aikkia — color de acción principal (70%) */
+  --color-brand-100: #dbe6ff;
+  --color-brand-300: #7fa0ff;
+  --color-brand-500: #3f6bf0;
+  --color-brand-600: #1f4bd6;
+  --color-brand-700: #17389e;
+
+  /* Teal aikkia — detalles, badges informativos (25%) */
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+
+  /* Ember aikkia — SOLO cifras en vivo, nunca texto normal (5%) */
+  --color-ember-400: #ff9a6b;
+  --color-ember-500: #ff7a45;
+
+  /* Solana — acento puntual (badge de red, éxito on-chain) */
+  --color-solana-purple: #9945ff;
+  --color-solana-green: #14f195;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+}
+
+/* Degradado de marca Solana — badges y acentos puntuales, nunca cuerpo de texto */
+.gradient-solana {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-solana-purple),
+    var(--color-solana-green)
+  );
+}
+
+/* Restyle del botón de wallet-adapter para que siga la paleta del proyecto */
+.wallet-adapter-button {
+  background-color: var(--color-brand-600) !important;
+  font-family: var(--font-sans), system-ui, sans-serif !important;
+  height: 38px !important;
+  font-size: 13px !important;
+}
+.wallet-adapter-button:not([disabled]):hover {
+  background-color: var(--color-brand-500) !important;
+}
+.wallet-adapter-modal-button-close {
+  background-color: var(--color-ink-soft) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background-color: var(--color-ink-soft) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background-color: var(--color-ink-line) !important;
 }

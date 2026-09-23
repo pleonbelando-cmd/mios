@@ -30,8 +30,8 @@ export function MarketClock({
       <span
         className={`rounded-full px-2.5 py-1 font-medium ${
           aaplx?.isOpen
-            ? "bg-emerald-500/15 text-emerald-400"
-            : "bg-zinc-800 text-zinc-400"
+            ? "bg-solana-green/15 text-solana-green"
+            : "bg-ink-line text-zinc-400"
         }`}
       >
         AAPLx {aaplx?.isOpen ? "cotizando 24/7" : "sin datos"}
@@ -39,8 +39,8 @@ export function MarketClock({
       <span
         className={`rounded-full px-2.5 py-1 font-medium ${
           aaplEquity?.isOpen
-            ? "bg-emerald-500/15 text-emerald-400"
-            : "bg-zinc-800 text-zinc-500"
+            ? "bg-solana-green/15 text-solana-green"
+            : "bg-ink-line text-zinc-500"
         }`}
       >
         NYSE (AAPL real){" "}
