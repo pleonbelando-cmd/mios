@@ -18,3 +18,7 @@ Fecha: 24/09/2026. Entorno local: Windows, Node 24.19.0.
 
 La prueba con wallet temporal no acredita el recorrido manual del equipo. Los mocks de las pruebas unitarias no se usan en la aplicación.
 
+## Vista previa remota
+
+Vercel ha creado la vista previa de la PR: https://mios-git-codex-stocklana-demo-pepe-leon-s-projects.vercel.app
+El despliegue figura Ready, pero Vercel exige acceso del equipo propietario. La cuenta disponible recibe “You Need Access”. No se ha podido comprobar la aplicación remota ni sus variables de entorno detrás de esa protección. La inspección visual y el flujo HTTP descritos arriba corresponden al servidor local construido desde esta rama. Pepe debe abrir la preview con acceso autorizado o facilitar acceso para completar esa comprobación antes de integrar.
