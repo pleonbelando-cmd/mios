@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SolanaProviders>
           <div className="flex flex-1 flex-col">{children}</div>
         </SolanaProviders>
-        <footer className="mx-auto w-full max-w-2xl border-t border-ink-line px-5 py-6 text-center text-xs leading-relaxed text-zinc-400">
+        <footer className="mx-auto w-full max-w-2xl border-t border-ink-line px-5 pb-28 pt-6 text-center text-xs leading-relaxed text-zinc-400">
           Demo de hackathon. Las acciones tokenizadas (xStocks/Ondo) representan
           exposición económica a la empresa correspondiente, no derechos de
           accionista. MIOS no está afiliado, patrocinado ni respaldado por

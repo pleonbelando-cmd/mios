@@ -39,6 +39,7 @@ function StoreSession() {
     (product) => ({ product, qty: cart[product.id] }),
   );
   const tickers = [...new Set(items.map((i) => i.product.ticker))];
+  const itemCount = items.reduce((sum, item) => sum + item.qty, 0);
   const ready =
     holdingsStatus === "idle" &&
     priceStatus === "idle" &&
@@ -308,8 +309,7 @@ function StoreSession() {
             href="#demo-summary"
             className="block rounded-xl bg-brand-600 px-4 py-3 text-center text-sm font-semibold"
           >
-            Ver resumen · {items.reduce((sum, item) => sum + item.qty, 0)}{" "}
-            productos
+            Ver resumen · {itemCount} {itemCount === 1 ? "producto" : "productos"}
           </a>
         </div>
       )}
