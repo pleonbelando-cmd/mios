@@ -1,59 +1,45 @@
-import { NextResponse } from "next/server";
 import { AAPLX_FEED_ID, getLatestPrices, getMarketHours } from "@/lib/pyth";
 import { getJupiterPrices } from "@/lib/jupiter";
-
-// @pythnetwork/hermes-client depende de `eventsource` y de Node 24; no vale
-// para Edge runtime.
+import { jsonResponse } from "@/lib/api-errors";
+import { isUsablePrice, type PriceEntry } from "@/lib/prices";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type PriceEntry = {
-  source: "pyth" | "jupiter";
-  price: number;
-  updatedAtMs: number;
-  stale: boolean;
-  stockRef: number | null;
-};
-
 export async function GET() {
-  const [marketHoursAaplx, marketHoursAapl, jupiterPrices] = await Promise.all([
-    getMarketHours("Crypto.AAPLX/USD"),
-    getMarketHours("Equity.US.AAPL/USD"),
-    getJupiterPrices().catch(() => ({})),
+  const [aaplx, aaplEquity, prices] = await Promise.all([
+    getMarketHours("Crypto.AAPLX/USD").catch(() => null),
+    getMarketHours("Equity.US.AAPL/USD").catch(() => null),
+    getJupiterPrices().catch(() => ({}) as Record<string, PriceEntry>),
   ]);
-  const marketHours = { aaplx: marketHoursAaplx, aaplEquity: marketHoursAapl };
-
-  const prices: Record<string, PriceEntry> = {};
-  for (const [ticker, entry] of Object.entries(jupiterPrices)) {
-    prices[ticker] = {
-      source: "jupiter",
-      price: entry.usdPrice,
-      updatedAtMs: entry.updatedAtMs,
-      stale: false,
-      stockRef: entry.stockRefPrice,
-    };
-  }
-
-  // AAPLx es el activo del bounty de Pyth: si hay PYTH_API_KEY de pago
-  // configurada, prioriza el precio real de Hermes sobre Jupiter para ese
-  // activo (el resto del catálogo se queda con Jupiter, gratis).
   if (process.env.PYTH_API_KEY) {
     try {
-      const pythPrices = await getLatestPrices([AAPLX_FEED_ID]);
-      const aaplx = pythPrices[AAPLX_FEED_ID];
-      if (aaplx) {
+      const p = (await getLatestPrices([AAPLX_FEED_ID]))[AAPLX_FEED_ID];
+      if (p && !p.stale && Number.isFinite(p.price) && p.price > 0) {
         prices.AAPLx = {
           source: "pyth",
-          price: aaplx.price,
-          updatedAtMs: aaplx.publishTimeMs,
-          stale: aaplx.stale,
+          price: p.price,
+          fetchedAtMs: Date.now(),
+          sourceUpdatedAtMs: p.publishTimeMs,
+          stale: p.stale,
           stockRef: prices.AAPLx?.stockRef ?? null,
+          stockRefUpdatedAtMs: prices.AAPLx?.stockRefUpdatedAtMs ?? null,
         };
       }
     } catch {
-      // se queda con el precio de Jupiter que ya está en `prices`
+      /* Keep Jupiter as fallback. */
     }
   }
-
-  return NextResponse.json({ prices, marketHours });
+  const available = Object.values(prices).some((p) => isUsablePrice(p));
+  return jsonResponse(
+    {
+      prices,
+      marketHours: { aaplx, aaplEquity },
+      ...(available
+        ? {}
+        : {
+            error:
+              "No hay cotizaciones recientes disponibles. Vuelve a intentarlo.",
+          }),
+    },
+    available ? 200 : 503,
+  );
 }

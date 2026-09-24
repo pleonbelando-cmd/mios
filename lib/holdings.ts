@@ -30,7 +30,7 @@ type ParsedTokenAccountInfo = {
  */
 export async function getPortfolioHoldings(
   connection: Connection,
-  owner: PublicKey
+  owner: PublicKey,
 ): Promise<AssetHolding[]> {
   const { value } = await connection.getParsedTokenAccountsByOwner(owner, {
     programId: TOKEN_2022_PROGRAM_ID,
@@ -42,7 +42,15 @@ export async function getPortfolioHoldings(
     const asset = findAssetByMint(info.mint);
     if (!asset) continue;
     const current = totals.get(asset.ticker) ?? 0;
-    totals.set(asset.ticker, current + (info.tokenAmount.uiAmount ?? 0));
+    const amount = info.tokenAmount.uiAmount;
+    if (
+      amount === null ||
+      !Number.isFinite(amount) ||
+      amount < 0 ||
+      !Number.isFinite(current + amount)
+    )
+      throw new Error("Invalid token balance");
+    totals.set(asset.ticker, current + amount);
   }
 
   return SUPPORTED_ASSETS.map((asset) => ({

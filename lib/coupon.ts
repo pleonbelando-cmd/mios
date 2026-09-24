@@ -1,78 +1,71 @@
-import { createHmac, timingSafeEqual } from "crypto";
-
+import { findAssetByTicker } from "./assets";
+import { parseWallet } from "./challenge";
+import { readSignedToken, signToken } from "./signed-token";
+import { TIERS } from "./tiers";
 export type CouponLine = {
   ticker: string;
   company: string;
   tierLabel: string | null;
   discountPct: number;
 };
-
 export type CouponPayload = {
+  version: 2;
+  demo: true;
   wallet: string;
   lines: CouponLine[];
-  timestamp: number; // unix seconds
+  timestamp: number;
 };
-
-const MAX_AGE_SECONDS = 24 * 60 * 60;
-
-function sign(payloadJson: string): string {
-  const secret = process.env.COUPON_SECRET;
-  if (!secret) throw new Error("COUPON_SECRET no configurada en .env.local");
-  return createHmac("sha256", secret).update(payloadJson).digest("base64url");
-}
-
-/** Server-only: firma el payload. No importar desde un componente cliente. */
-export function createCouponToken(payload: CouponPayload): string {
-  const payloadJson = JSON.stringify(payload);
-  const payloadB64 = Buffer.from(payloadJson).toString("base64url");
-  return `${payloadB64}.${sign(payloadJson)}`;
-}
-
 export type VerifyResult =
-  | { valid: true; payload: CouponPayload }
-  | { valid: false; reason: string };
-
-/** Server-only: verifica firma + caducidad (24h). */
-export function verifyCouponToken(token: string): VerifyResult {
-  const [payloadB64, signature] = token.split(".");
-  if (!payloadB64 || !signature) {
-    return { valid: false, reason: "Formato de cupón inválido" };
-  }
-
-  let payloadJson: string;
+  { valid: true; payload: CouponPayload } | { valid: false; reason: string };
+export function createCouponToken(payload: CouponPayload) {
+  return signToken("mios-coupon-v2", payload);
+}
+export function verifyCouponToken(
+  token: string,
+  now = Math.floor(Date.now() / 1000),
+): VerifyResult {
   try {
-    payloadJson = Buffer.from(payloadB64, "base64url").toString("utf8");
+    const payload = readSignedToken("mios-coupon-v2", token) as CouponPayload;
+    if (
+      !payload ||
+      payload.version !== 2 ||
+      payload.demo !== true ||
+      !Number.isSafeInteger(payload.timestamp) ||
+      payload.timestamp > now + 30 ||
+      !Array.isArray(payload.lines) ||
+      !payload.lines.length ||
+      payload.lines.length > 5
+    )
+      throw new Error();
+    parseWallet(payload.wallet);
+    if (
+      new Set(payload.lines.map((l) => l?.ticker)).size !== payload.lines.length
+    )
+      throw new Error();
+    for (const line of payload.lines) {
+      const asset = findAssetByTicker(line?.ticker);
+      const validTier =
+        line?.discountPct === 0
+          ? line.tierLabel === null
+          : TIERS.some(
+              (t) =>
+                t.label === line?.tierLabel &&
+                t.discountPct === line?.discountPct,
+            );
+      if (!asset || line.company !== asset.company || !validTier)
+        throw new Error();
+    }
+    if (now - payload.timestamp >= 86400)
+      return {
+        valid: false,
+        reason: "Cupón caducado (24 horas desde la emisión).",
+      };
+    return { valid: true, payload };
   } catch {
-    return { valid: false, reason: "Formato de cupón inválido" };
+    return {
+      valid: false,
+      reason:
+        "Cupón no válido. Puede estar manipulado o pertenecer a una versión anterior de la demo.",
+    };
   }
-
-  let expectedSignature: string;
-  try {
-    expectedSignature = sign(payloadJson);
-  } catch {
-    return { valid: false, reason: "Servidor sin COUPON_SECRET configurada" };
-  }
-
-  const sigBuf = Buffer.from(signature);
-  const expectedBuf = Buffer.from(expectedSignature);
-  if (
-    sigBuf.length !== expectedBuf.length ||
-    !timingSafeEqual(sigBuf, expectedBuf)
-  ) {
-    return { valid: false, reason: "Firma inválida: el cupón ha sido manipulado" };
-  }
-
-  let payload: CouponPayload;
-  try {
-    payload = JSON.parse(payloadJson) as CouponPayload;
-  } catch {
-    return { valid: false, reason: "Payload de cupón corrupto" };
-  }
-
-  const ageSeconds = Math.floor(Date.now() / 1000) - payload.timestamp;
-  if (ageSeconds > MAX_AGE_SECONDS) {
-    return { valid: false, reason: "Cupón caducado (válido 24h desde la compra)" };
-  }
-
-  return { valid: true, payload };
 }

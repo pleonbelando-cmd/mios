@@ -1,14 +1,12 @@
 import type { AssetPosition } from "@/hooks/usePortfolio";
 import { TokenIcon } from "./TokenIcon";
-
-function usd(value: number) {
-  return value.toLocaleString("es-ES", {
+import { TIERS } from "@/lib/tiers";
+const usd = (n: number) =>
+  n.toLocaleString("es-ES", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 2,
   });
-}
-
 export function PortfolioList({
   positions,
   status,
@@ -16,68 +14,79 @@ export function PortfolioList({
   positions: AssetPosition[];
   status: "idle" | "loading" | "error";
 }) {
-  if (status === "loading") {
+  if (status === "loading")
     return (
-      <p className="text-sm text-zinc-400">Leyendo tu portfolio on-chain…</p>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <p className="text-sm text-red-400">
-        No se pudo leer el portfolio. Revisa NEXT_PUBLIC_SOLANA_RPC_URL en
-        .env.local.
+      <p role="status" className="text-sm text-zinc-300">
+        Comprobando tu cartera en Solana…
       </p>
     );
-  }
-
+  if (status === "error")
+    return (
+      <p role="alert" className="text-sm text-red-300">
+        No hemos podido leer la cartera. Volveremos a intentarlo
+        automáticamente; también puedes volver a esta ventana para actualizar.
+      </p>
+    );
   return (
     <div className="overflow-hidden rounded-xl border border-ink-line">
-      {positions.map(({ asset, uiAmount, usdValue, tierResult }, i) => {
-        const held = uiAmount > 0;
+      {positions.map(({ asset, uiAmount, usdValue, tierResult }) => {
+        const next = tierResult?.nextTier;
+        const target = next?.minUsd ?? TIERS[TIERS.length - 1].minUsd;
+        const progress =
+          usdValue === null ? 0 : Math.min(100, (usdValue / target) * 100);
         return (
           <div
             key={asset.ticker}
-            className={`flex items-center gap-3 p-3 ${
-              held ? "bg-ink-soft" : "bg-ink"
-            } ${i > 0 ? "border-t border-ink-line" : ""}`}
+            className="border-b border-ink-line bg-ink-soft p-4 last:border-0"
           >
-            <TokenIcon logoUrl={asset.logoUrl} ticker={asset.ticker} />
-
-            <div className="min-w-0 flex-1">
-              <p
-                className={`truncate text-sm font-medium ${held ? "text-zinc-100" : "text-zinc-500"}`}
-              >
-                {asset.ticker}{" "}
-                <span className="font-normal text-zinc-500">
-                  · {asset.company}
-                </span>
-              </p>
-              <p className="text-xs text-zinc-600">
-                {held
-                  ? `${uiAmount.toLocaleString("es-ES", { maximumFractionDigits: 4 })} ${asset.ticker}`
-                  : "Sin posición"}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              {held && usdValue !== null && (
-                <span className="text-sm font-semibold text-ember-400">
-                  {usd(usdValue)}
-                </span>
-              )}
-              {tierResult?.tier ? (
-                <span className="rounded-full bg-teal-500/15 px-2.5 py-0.5 text-xs font-medium text-teal-300">
-                  {tierResult.tier.discountPct}% dto.
-                </span>
-              ) : (
-                held && (
-                  <span className="rounded-full bg-ink-line px-2.5 py-0.5 text-xs font-medium text-zinc-500">
-                    Sin tier
+            <div className="flex items-center gap-3">
+              <TokenIcon logoUrl={asset.logoUrl} ticker={asset.ticker} />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  {asset.ticker}{" "}
+                  <span className="text-xs font-normal text-zinc-400">
+                    · {asset.company}
                   </span>
-                )
-              )}
+                </p>
+                <p className="text-xs text-zinc-300">
+                  {uiAmount.toLocaleString("es-ES", {
+                    maximumFractionDigits: 4,
+                  })}{" "}
+                  tokens
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-ember-400">
+                  {usdValue === null ? "—" : usd(usdValue)}
+                </p>
+                <p className="text-xs text-teal-300">
+                  {tierResult?.tier
+                    ? tierResult.tier.discountPct + "% de beneficio demo"
+                    : usdValue === null
+                      ? "Valoración pendiente"
+                      : "Sin beneficio aún"}
+                </p>
+              </div>
             </div>
+            {usdValue !== null && (
+              <div className="mt-3">
+                <progress
+                  aria-label={"Progreso del beneficio de " + asset.ticker}
+                  max={100}
+                  value={progress}
+                  className="h-1.5 w-full accent-teal-400"
+                />
+                <p className="mt-1 text-xs text-zinc-300">
+                  {next
+                    ? "Faltan " +
+                      usd(tierResult!.usdToNextTier!) +
+                      " para el " +
+                      next.discountPct +
+                      "%."
+                    : "Nivel máximo de la campaña de ejemplo."}
+                </p>
+              </div>
+            )}
           </div>
         );
       })}
