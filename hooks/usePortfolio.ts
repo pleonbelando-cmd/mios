@@ -1,36 +1,17 @@
 "use client";
-
 import { useEffect, useState } from "react";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useActiveOwner } from "@/contexts/ActiveOwnerContext";
 import { getPortfolioHoldings, type AssetHolding } from "@/lib/holdings";
 import { resolveTier, type TierResult } from "@/lib/tiers";
 import { SUPPORTED_ASSETS, type AssetConfig } from "@/lib/assets";
-
-type FetchStatus = "idle" | "loading" | "error";
-
-type MarketHoursReading = {
-  isOpen: boolean;
-  nextOpen: number | null;
-  nextClose: number | null;
-} | null;
-
-type PriceEntry = {
-  source: "pyth" | "jupiter";
-  price: number;
-  updatedAtMs: number;
-  stale: boolean;
-  stockRef: number | null;
-};
-
-type PriceApiResponse = {
-  prices?: Record<string, PriceEntry>;
-  marketHours?: {
-    aaplx: MarketHoursReading;
-    aaplEquity: MarketHoursReading;
-  };
-};
-
+import {
+  isUsablePrice,
+  type PriceApiResponse,
+  type PriceEntry,
+} from "@/lib/prices";
+export type FetchStatus = "idle" | "loading" | "error";
 export type AssetPosition = {
   asset: AssetConfig;
   uiAmount: number;
@@ -38,93 +19,159 @@ export type AssetPosition = {
   usdValue: number | null;
   tierResult: TierResult | null;
 };
-
-const PRICE_POLL_MS = 20_000;
-
-/**
- * Portfolio completo (los 5 xStocks de lib/assets.ts) para la wallet activa
- * (conectada o "peekeada"): balance on-chain + precio (Jupiter, o Pyth para
- * AAPLx si hay clave) + tier por activo. Compartido entre el dashboard y el
- * marketplace para que ambos vean exactamente las mismas posiciones/tiers.
- */
+const POLL_MS = 20_000;
+type HoldingsState = {
+  owner: string;
+  connection: Connection;
+  holdings: AssetHolding[];
+  status: FetchStatus;
+  at: number;
+};
 export function usePortfolio() {
   const { connection } = useConnection();
   const { activeOwner } = useActiveOwner();
-
-  const [holdings, setHoldings] = useState<AssetHolding[]>([]);
-  const [holdingsStatus, setHoldingsStatus] = useState<FetchStatus>("idle");
-
+  const ownerKey = activeOwner?.toBase58() ?? "";
+  const [snapshot, setSnapshot] = useState<HoldingsState | null>(null);
   const [priceData, setPriceData] = useState<PriceApiResponse | null>(null);
-  const [priceStatus, setPriceStatus] = useState<FetchStatus>("idle");
+  const [priceStatus, setPriceStatus] = useState<FetchStatus>("loading");
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!activeOwner) {
-      return;
-    }
-
-    let cancelled = false;
-    // Patrón estándar loading->fetch->idle/error con cleanup por `cancelled`.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHoldingsStatus("loading");
-
-    getPortfolioHoldings(connection, activeOwner)
-      .then((result) => {
-        if (cancelled) return;
-        setHoldings(result);
-        setHoldingsStatus("idle");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setHoldingsStatus("error");
+    if (!ownerKey) return;
+    let cancelled = false,
+      busy = false;
+    async function refresh() {
+      if (busy || cancelled) return;
+      busy = true;
+      setSnapshot({
+        owner: ownerKey,
+        connection,
+        holdings: [],
+        status: "loading",
+        at: 0,
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [connection, activeOwner]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchPrices() {
-      setPriceStatus((prev) => (prev === "idle" ? "loading" : prev));
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const res = await fetch("/api/price", { cache: "no-store" });
-        const data = (await res.json()) as PriceApiResponse;
-        if (cancelled) return;
-        setPriceData(data);
-        setPriceStatus("idle");
+        const holdings = await Promise.race([
+          getPortfolioHoldings(connection, new PublicKey(ownerKey)),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("timeout")), 10_000);
+          }),
+        ]);
+        if (!cancelled)
+          setSnapshot({
+            owner: ownerKey,
+            connection,
+            holdings,
+            status: "idle",
+            at: Date.now(),
+          });
       } catch {
-        if (cancelled) return;
-        setPriceStatus("error");
+        if (!cancelled)
+          setSnapshot({
+            owner: ownerKey,
+            connection,
+            holdings: [],
+            status: "error",
+            at: 0,
+          });
+      } finally {
+        clearTimeout(timer);
+        busy = false;
       }
     }
-
-    fetchPrices();
-    const interval = setInterval(fetchPrices, PRICE_POLL_MS);
+    void Promise.resolve().then(refresh);
+    const interval = setInterval(refresh, POLL_MS);
+    window.addEventListener("focus", refresh);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [connection, ownerKey]);
+
+  useEffect(() => {
+    let cancelled = false,
+      busy = false;
+    const controller = new AbortController();
+    async function refresh() {
+      if (cancelled || busy) return;
+      busy = true;
+      setPriceStatus("loading");
+      try {
+        const res = await fetch("/api/price", {
+          cache: "no-store",
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(20_000),
+          ]),
+        });
+        const data = (await res.json()) as PriceApiResponse;
+        if (!res.ok || !data.prices || typeof data.prices !== "object")
+          throw new Error();
+        if (!cancelled) {
+          setPriceData(data);
+          setPriceStatus("idle");
+          setNow(Date.now());
+        }
+      } catch {
+        if (!cancelled) {
+          setPriceData(null);
+          setPriceStatus("error");
+        }
+      } finally {
+        busy = false;
+      }
+    }
+    void Promise.resolve().then(refresh);
+    const interval = setInterval(refresh, POLL_MS);
+    const clock = setInterval(() => setNow(Date.now()), 1000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearInterval(interval);
+      clearInterval(clock);
+      window.removeEventListener("focus", refresh);
     };
   }, []);
 
-  const effectiveHoldings = activeOwner ? holdings : [];
-  const effectiveHoldingsStatus: FetchStatus = activeOwner ? holdingsStatus : "idle";
-
+  const matching =
+    snapshot?.owner === ownerKey && snapshot?.connection === connection;
+  const holdingsStatus: FetchStatus = !ownerKey
+    ? "idle"
+    : !matching
+      ? "loading"
+      : snapshot.status === "idle" && now - snapshot.at > 30_000
+        ? "loading"
+        : snapshot.status;
+  const holdings =
+    ownerKey && matching && holdingsStatus === "idle" ? snapshot.holdings : [];
   const positions: AssetPosition[] = SUPPORTED_ASSETS.map((asset) => {
-    const holding = effectiveHoldings.find((h) => h.asset.ticker === asset.ticker);
-    const uiAmount = holding?.uiAmount ?? 0;
+    const uiAmount =
+      holdings.find((h) => h.asset.ticker === asset.ticker)?.uiAmount ?? 0;
     const price = priceData?.prices?.[asset.ticker] ?? null;
-    const usdValue = price ? uiAmount * price.price : null;
-    const tierResult = usdValue !== null ? resolveTier(usdValue) : null;
-
-    return { asset, uiAmount, price, usdValue, tierResult };
+    const value = uiAmount * (price?.price ?? 0);
+    const usdValue =
+      !!ownerKey &&
+      holdingsStatus === "idle" &&
+      priceStatus === "idle" &&
+      isUsablePrice(price, now) &&
+      Number.isFinite(value)
+        ? value
+        : null;
+    return {
+      asset,
+      uiAmount,
+      price,
+      usdValue,
+      tierResult: usdValue === null ? null : resolveTier(usdValue),
+    };
   });
-
   return {
     owner: activeOwner,
     positions,
-    holdingsStatus: effectiveHoldingsStatus,
+    holdingsStatus,
     priceStatus,
     marketHours: priceData?.marketHours ?? null,
   };

@@ -1,5 +1,7 @@
 @AGENTS.md
 
+> Actualización 24/09/2026: para el alcance y los contratos vigentes prevalecen README.md y docs/RELEASE.md sobre los planes históricos siguientes. Prioridad: main track, demo sin pagos ni compraventa. La emisión requiere desafío de 5 minutos + firma Ed25519; el servidor relee saldos y precios de Jupiter, valida antigüedad vía blockId/getBlockTime y calcula el tier. Consulta de direcciones: solo lectura. Cupones v2: demostración, 24 horas, sin canje ni uso único; v1 rechazados. Pyth aporta horarios y opcionalmente el precio AAPLx del dashboard. No contratar servicios ni afirmar acuerdos con marcas. Mantener la identidad y los cinco activos. Pruebas: npm test, npm run typecheck, npm run lint, npm run build (Node 24).
+
 # MIOS — Beneficios programables para holders de acciones tokenizadas
 
 > Proyecto para el hackathon **Stocklana** (Solana Foundation).
@@ -44,7 +46,7 @@ comercio puede leer la posición del cliente en su wallet y recompensarla de for
 **Usuario:** (a) el inversor-cliente que quiere que su cartera le dé ventajas al consumir;
 (b) la marca que quiere fidelizar a sus inversores minoristas sin fricción ni intermediarios.
 
-**Por qué en Solana (esto lo puntúan):** los tokens de xStocks/Ondo solo existen en Solana, son SPL
+**Por qué en Solana (esto lo puntúan):** esta implementación utiliza xStocks en Solana; estos activos también existen en otras redes. Sus tokens en Solana son SPL
 transferibles y componibles, y se leen 24/7 desde cualquier app sin permiso del emisor. Un certificado
 de acción en papel no permite nada de esto.
 

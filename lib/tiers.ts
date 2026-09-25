@@ -19,13 +19,16 @@ export type TierResult = {
 
 /** Config editable en un solo sitio: valor USD de la posición -> tier + descuento. */
 export function resolveTier(usdValue: number): TierResult {
+  if (!Number.isFinite(usdValue) || usdValue < 0)
+    return { tier: null, nextTier: null, usdToNextTier: null };
   let current: Tier | null = null;
   for (const tier of TIERS) {
     if (usdValue >= tier.minUsd) current = tier;
   }
 
   const nextTier =
-    TIERS.find((tier) => current === null || tier.minUsd > current.minUsd) ?? null;
+    TIERS.find((tier) => current === null || tier.minUsd > current.minUsd) ??
+    null;
 
   return {
     tier: current,

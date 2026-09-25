@@ -1,90 +1,98 @@
 # MIOS
 
-**Beneficios programables para holders de acciones tokenizadas.** Proyecto para el hackathon
-[Stocklana](https://hackathons.solana.com/hackathons/stocklana) (Solana Foundation).
+**Turn a verified tokenized-stock position into demonstrable shopping benefits.**
 
-**Demo en vivo:** https://mios-omega.vercel.app
+Built for [Stocklana](https://hackathons.solana.com/hackathons/stocklana).
+Existing production demo: https://mios-omega.vercel.app
+The Stocklana improvements are delivered through a PR and preview; this link does not imply they have been merged.
 
-## El problema
+## The experience
 
-Hoy tener acciones y ser cliente de una empresa son dos mundos separados: un holder de Apple no
-obtiene nada como cliente de Apple. Con acciones tokenizadas en Solana ([xStocks](https://xstocks.com/)),
-cualquier comercio puede leer la posición del cliente en su wallet y recompensarla de forma
-automática y verificable — algo que un certificado de acción en papel nunca podría dar.
+1. Connect a Solana wallet, or inspect a public address in read-only mode.
+2. Read real Token-2022 holdings for AAPLx, NVDAx, TSLAx, SPYx and GOOGLx.
+3. See each position's value, illustrative benefit and progress toward the next level.
+4. Choose generic products in a clearly labelled demonstration marketplace.
+5. Sign a readable message proving control of your wallet. This is **not a transaction**.
+6. The server verifies the signature, rereads holdings and Jupiter prices, and signs a demonstration coupon.
+7. Open or scan the QR to verify the signed record and its 24-hour expiry.
 
-## Qué hace
+Thresholds apply **per asset**: $500 → 5%, $2,000 → 10%, $10,000 → 15%.
+Balances below $500 receive 0%, including when a coupon covers several assets.
+The independent `/example` page uses explicitly fictional values. It never issues a signed coupon.
 
-1. Conecta tu wallet (Phantom, vía Wallet Standard) — o pega cualquier dirección pública en el
-   modo "ver wallet".
-2. Lee tu **portfolio real de xStocks** (5 activos: AAPLx, NVDAx, TSLAx, SPYx, GOOGLx —
-   Token-2022) directamente on-chain, en una sola llamada, y lo muestra estilo exchange: logo
-   oficial de cada activo, balance y valor en USD.
-3. Valora cada posición en USD en tiempo real y calcula un **tier y % de descuento por empresa**
-   (más acciones de una empresa = más descuento en su sección, no en las demás).
-4. Muestra en vivo que AAPLx cotiza 24/7 mientras la acción real de Apple solo cotiza en horario
-   NYSE (dato de Pyth Network).
-5. **Marketplace** organizado por la empresa real de cada activo (Apple, NVIDIA, Tesla, S&P 500,
-   Alphabet — con su logo oficial): el carrito puede mezclar productos de varias secciones, cada
-   línea con su propio descuento. Los productos son genéricos (no réplicas de productos oficiales
-   de cada marca) — ver disclaimer.
-6. Al confirmar la compra emite un **cupón firmado (HMAC) con QR verificable**, con una línea de
-   descuento por cada empresa comprada — escanéalo y `/verify` comprueba la firma en el servidor.
+## What is real and what is illustrative
 
-## Por qué Solana
+| Real                                                         | Illustrative / not implemented                           |
+| ------------------------------------------------------------ | -------------------------------------------------------- |
+| Wallet control via Ed25519 message signature                 | Merchant campaigns, products and shopping totals         |
+| Mainnet Token-2022 holdings, summing all accounts for a mint | Commercial agreements with the displayed companies       |
+| Jupiter token prices and on-chain block-time recency checks  | Payment, trading and commercial redemption               |
+| Pyth market-hours metadata                                   | Minimum holding period and single-use redemption         |
+| Server-calculated benefit and HMAC-signed evidence           | Any investment recommendation or shareholder entitlement |
 
-Los tokens de xStocks solo existen en Solana: son SPL (Token-2022) transferibles y componibles, y
-se leen 24/7 desde cualquier app sin permiso del emisor. Eso es lo que hace posible este producto.
+A coupon proves the checked position **at issuance**, not the current balance when scanned.
+It is a demonstration, not redeemable, and not single-use. The five-minute proof can be reused during its validity; every issuance rereads eligibility. There is no order database or redemption ledger.
 
-## Qué es real y qué es demo
+xStocks provide exposure to underlying equities; they do not by themselves confer shareholder rights.
+MIOS is not affiliated with or endorsed by Apple, NVIDIA, Tesla, Alphabet or S&P Dow Jones Indices.
+The names/logos identify the underlying assets; products are generic examples.
 
-| | |
-|---|---|
-| Balance de los 5 xStocks | **Real.** Lectura on-chain, Token-2022, incluye el ajuste `scaledUiAmount`. |
-| Badge "AAPLx 24/7 / NYSE cerrado" | **Real.** `market_hours` de Pyth Network, sin clave. |
-| Precio de cada activo en USD | **Real**, vía [Jupiter Price API](https://dev.jup.ag/docs/price-api) (gratis, batch de los 5 en una llamada). Pyth Hermes da el mismo dato para AAPLx pero solo con plan de pago (Starter, 500 $/mes) — el código ya está listo para activarlo si algún día hay `PYTH_API_KEY`. |
-| Panel prima/descuento AAPLx vs AAPL real | **Real**, mismo endpoint de Jupiter. |
-| Cupón con QR | **Real.** Firmado con HMAC-SHA256 server-side, verificable en `/verify`, caduca en 24h. |
-| Logo de cada empresa (Apple, NVIDIA, Tesla, S&P 500, Alphabet) | **Real** — icono oficial del xStock publicado por Backed (el emisor del token), mismo dato que muestra cualquier wallet/exchange. |
-| Productos del marketplace | **Genéricos**, a propósito — no son réplicas de productos oficiales de cada marca, solo agrupados por la empresa real que da el descuento. |
-| Checkout | **Maqueta.** No hay pasarela de pago real. |
+## Why Solana
 
-> Las acciones tokenizadas (xStocks/Ondo) representan exposición económica, no derechos de
-> accionista. MIOS no está afiliado, patrocinado ni respaldado por Apple, NVIDIA, Tesla, Alphabet
-> ni S&P Dow Jones Indices. No es asesoramiento financiero.
+Solana's publicly readable token accounts and wallet standards make it possible to check an eligible position without taking custody. These xStocks use Token-2022, including scaled UI balances. xStocks also exist on other chains; exclusivity to Solana is not our argument.
 
-## Stack
+## Prices and market data
 
-Next.js 16 (App Router) · TypeScript · Tailwind v4 · `@solana/web3.js` + `@solana/spl-token`
-(Token-2022) · `@solana/wallet-adapter-react` (Wallet Standard, sin adaptadores explícitos) ·
-Jupiter Price API v3 · Pyth Network (`market_hours`, y Hermes si hay clave) · Vercel.
+- Coupon eligibility always uses a fresh server request to Jupiter. The existing deployment's lite endpoint is retained; setting `JUPITER_API_KEY` selects the official keyed endpoint.
+- `blockId` is resolved through Solana `getBlockTime`. Missing block time, a token quote older than 120 seconds, nonpositive prices or unavailable sources prevent issuance.
+- `fetchedAtMs` is the time we queried the source. `sourceUpdatedAtMs` is token block time (Jupiter) or feed publication time (Pyth). `stockRefUpdatedAtMs` belongs only to the underlying equity reference; it may be a closing price.
+- Pyth supplies market-hours metadata. Optional existing `PYTH_API_KEY` enables the AAPLx dashboard feed with Jupiter fallback. The coupon still uses Jupiter and its returned calculation is authoritative.
+- Source failures are visible; missing data is never substituted with invented prices or discounts.
 
-## Desarrollo local
+## Run locally
 
-```bash
-npm install
-cp .env.local.example .env.local   # rellena NEXT_PUBLIC_SOLANA_RPC_URL (Helius, gratis) y COUPON_SECRET
+Requires **Node 24**.
+
+```sh
+npm ci
+cp .env.local.example .env.local
+# Configure RPC and a random COUPON_SECRET of at least 32 bytes.
 npm run dev
 ```
 
-`PYTH_API_KEY` es opcional — sin ella, el precio se obtiene igualmente vía Jupiter.
+On PowerShell, use `Copy-Item .env.local.example .env.local`.
+Never commit real keys or wallet secrets. Generate the HMAC secret with:
+`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
-## Estructura
+The public RPC fallback is best-effort; reliable demos need an RPC that supports parsed Token-2022 accounts and block times. Restrict the browser RPC credential appropriately. A separate `SOLANA_RPC_URL` keeps the server RPC credential out of browser bundles.
 
-```
-app/
-  page.tsx             dashboard: wallet, portfolio (5 activos), tier por activo, prima/descuento
-  store/page.tsx        marketplace: secciones por marca, carrito multi-activo, checkout, cupón
-  verify/page.tsx        verificación del cupón (destino del QR)
-  api/price/route.ts     precio de los 5 activos (Jupiter, o Pyth para AAPLx si hay clave) + market_hours
-  api/coupon/route.ts    firma del cupón (re-valida tiers server-side)
-lib/
-  assets.ts     catálogo de xStocks soportados + empresa real y logo por activo
-  holdings.ts   balance de los 5 activos on-chain (Token-2022), una sola llamada RPC
-  pyth.ts       cliente Hermes + market_hours (AAPLx)
-  jupiter.ts    precio gratuito de los 5 activos, en batch
-  tiers.ts      motor de tiers/descuentos (mismo config, por activo)
-  products.ts   catálogo del marketplace, un producto ligado a un ticker
-  coupon.ts     firma y verificación HMAC, multi-línea (una por marca comprada)
+```sh
+npm test
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Contexto completo del proyecto (decisiones, hallazgos verificados, plan) en [`CLAUDE.md`](./CLAUDE.md).
+## API changes
+
+- `POST /api/coupon/challenge`: JSON `{wallet, tickers}`. Returns `{challenge, message, expiresAt}`. Sign the exact UTF-8 message using the matching wallet. The server HMAC binds domain, wallet, sorted tickers, random nonce and a five-minute validity period.
+- `POST /api/coupon`: JSON `{challenge, signature}`, with a standard base64 Ed25519 signature. Returns `{token, lines, wallet, issuedAt, expiresAt, demo:true}`. Client-supplied wallets, percentages and tiers are rejected.
+- `GET /api/price`: prices with source, separate observation/source/reference timestamps and stale state, plus optional market hours. Returns 503 if no quote can be treated as recent.
+- `/verify?c=...`: validates the version-2 coupon's signature, schema and expiry. Version-1 coupons are intentionally rejected because their eligibility was not authenticated.
+
+Signing purposes are separated between challenges and coupons. Responses use `no-store`; request bodies are bounded to 8 KiB. Invalid inputs return 4xx, upstream/configuration failures return a safe 503.
+
+## Delivery and limitations
+
+[Submission copy](docs/SUBMISSION.md) · [Video script](docs/VIDEO.md) · [Release checklist](docs/RELEASE.md)
+
+Tests exercise cryptography with generated test-only Ed25519 keys, mocked upstream boundaries and React hooks. They do not replace a manual Phantom test with the team's real wallet.
+
+Next.js, React, Tailwind, Solana libraries, Pyth's Hermes client and react-qr-code are open-source components used by this project. Vitest and Testing Library provide automated checks. A production commercial pilot would additionally require merchant agreements, campaign budgets, abuse controls, a redemption ledger and an appropriate operating/compliance model.
+
+## References
+
+- [Stocklana rules](https://hackathons.solana.com/hackathons/stocklana)
+- [Jupiter price API and blockId recency](https://developers.jup.ag/docs/price)
+- [xStocks integration and supported chains](https://xstocks.com/partner)
+- [xStocks product rights](https://www.kraken.com/legal/xstocks)

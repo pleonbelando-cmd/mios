@@ -44,7 +44,11 @@ export function MarketClock({
         }`}
       >
         NYSE (AAPL real){" "}
-        {aaplEquity?.isOpen ? "abierto" : `cerrado${nextOpen ? ` · abre ${nextOpen}` : ""}`}
+        {!aaplEquity
+          ? "sin datos"
+          : aaplEquity.isOpen
+            ? "abierto"
+            : `cerrado${nextOpen ? ` · abre ${nextOpen}` : ""}`}
       </span>
     </div>
   );

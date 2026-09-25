@@ -1,279 +1,318 @@
 "use client";
-
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { PRODUCTS } from "@/lib/products";
 import { SUPPORTED_ASSETS } from "@/lib/assets";
-import { usePortfolio, type AssetPosition } from "@/hooks/usePortfolio";
+import { usePortfolio } from "@/hooks/usePortfolio";
+import { useActiveOwner } from "@/contexts/ActiveOwnerContext";
 import { Coupon } from "@/components/Coupon";
 import { TokenIcon } from "@/components/TokenIcon";
-import type { CouponLine } from "@/lib/coupon";
-
-function usd(value: number) {
-  return value.toLocaleString("es-ES", {
+import { requestCoupon, type CouponResult } from "@/lib/request-coupon";
+const usd = (n: number) =>
+  n.toLocaleString("es-ES", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 2,
   });
-}
-
 export default function StorePage() {
-  const { owner, positions } = usePortfolio();
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [purchased, setPurchased] = useState(false);
-  const [couponToken, setCouponToken] = useState<string | null>(null);
-  const [couponLines, setCouponLines] = useState<CouponLine[] | null>(null);
-  const [couponStatus, setCouponStatus] = useState<"idle" | "loading" | "error">("idle");
-
-  const positionByTicker = useMemo(() => {
-    const map = new Map<string, AssetPosition>();
-    for (const p of positions) map.set(p.asset.ticker, p);
-    return map;
-  }, [positions]);
-
-  const items = useMemo(
-    () =>
-      PRODUCTS.map((product) => ({ product, qty: cart[product.id] ?? 0 })).filter(
-        (item) => item.qty > 0
-      ),
-    [cart]
+  const { activeOwner, connectedOwner, peeked } = useActiveOwner();
+  return (
+    <StoreSession
+      key={[activeOwner?.toBase58(), connectedOwner?.toBase58(), !!peeked].join(
+        ":",
+      )}
+    />
   );
-
-  const lineTotals = items.map((item) => {
-    const discountPct = positionByTicker.get(item.product.ticker)?.tierResult?.tier?.discountPct ?? 0;
-    const subtotal = item.product.priceUsd * item.qty;
-    const discount = (subtotal * discountPct) / 100;
-    return { ...item, discountPct, subtotal, discount };
-  });
-
-  const subtotal = lineTotals.reduce((sum, l) => sum + l.subtotal, 0);
-  const discount = lineTotals.reduce((sum, l) => sum + l.discount, 0);
-  const total = subtotal - discount;
-
-  function addToCart(productId: string) {
-    setPurchased(false);
-    setCart((prev) => ({ ...prev, [productId]: (prev[productId] ?? 0) + 1 }));
+}
+function StoreSession() {
+  const { owner, positions, holdingsStatus, priceStatus } = usePortfolio();
+  const { connectedOwner, peeked } = useActiveOwner();
+  const { signMessage } = useWallet();
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [result, setResult] = useState<CouponResult | null>(null);
+  const [stage, setStage] = useState<"idle" | "signing" | "checking">("idle");
+  const [error, setError] = useState("");
+  const requestRef = useRef<AbortController | null>(null);
+  useEffect(() => () => requestRef.current?.abort(), []);
+  const items = PRODUCTS.filter((p) => (cart[p.id] ?? 0) > 0).map(
+    (product) => ({ product, qty: cart[product.id] }),
+  );
+  const tickers = [...new Set(items.map((i) => i.product.ticker))];
+  const itemCount = items.reduce((sum, item) => sum + item.qty, 0);
+  const ready =
+    holdingsStatus === "idle" &&
+    priceStatus === "idle" &&
+    tickers.every(
+      (t) => positions.find((p) => p.asset.ticker === t)?.usdValue != null,
+    );
+  const ownWallet =
+    !!owner && !!connectedOwner && owner.equals(connectedOwner) && !peeked;
+  const canIssue =
+    ownWallet && !!signMessage && ready && items.length > 0 && stage === "idle";
+  const subtotal = items.reduce(
+    (sum, i) => sum + i.product.priceUsd * i.qty,
+    0,
+  );
+  const discountFor = (ticker: string) =>
+    result
+      ? (result.lines.find((l) => l.ticker === ticker)?.discountPct ?? 0)
+      : ready
+        ? (positions.find((p) => p.asset.ticker === ticker)?.tierResult?.tier
+            ?.discountPct ?? 0)
+        : 0;
+  const total = items.reduce(
+    (sum, i) =>
+      sum +
+      i.product.priceUsd * i.qty * (1 - discountFor(i.product.ticker) / 100),
+    0,
+  );
+  function change(id: string, delta: number) {
+    setError("");
+    setCart((prev) => ({
+      ...prev,
+      [id]: Math.max(0, Math.min(99, (prev[id] ?? 0) + delta)),
+    }));
   }
-
-  function removeFromCart(productId: string) {
-    setCart((prev) => {
-      const next = { ...prev };
-      const qty = (next[productId] ?? 0) - 1;
-      if (qty <= 0) delete next[productId];
-      else next[productId] = qty;
-      return next;
-    });
-  }
-
-  async function handleConfirm() {
-    setPurchased(true);
-
-    const tickers = [...new Set(items.map((item) => item.product.ticker))];
-    if (!owner || tickers.length === 0) {
-      setCouponToken(null);
-      setCouponLines(null);
-      return;
-    }
-
-    setCouponStatus("loading");
+  async function confirm() {
+    if (!canIssue || !owner || !signMessage || requestRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setError("");
+    setStage("signing");
     try {
-      const res = await fetch("/api/coupon", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet: owner.toBase58(),
-          lines: tickers.map((ticker) => ({
-            ticker,
-            tierId: positionByTicker.get(ticker)?.tierResult?.tier?.id ?? null,
-          })),
-        }),
-      });
-      if (!res.ok) throw new Error("no ok");
-      const data = (await res.json()) as { token: string };
-
-      setCouponToken(data.token);
-      setCouponLines(
-        tickers.map((ticker) => {
-          const asset = SUPPORTED_ASSETS.find((a) => a.ticker === ticker)!;
-          const tier = positionByTicker.get(ticker)?.tierResult?.tier;
-          return {
-            ticker,
-            company: asset.company,
-            tierLabel: tier?.label ?? null,
-            discountPct: tier?.discountPct ?? 0,
-          };
-        })
+      const issued = await requestCoupon(
+        owner.toBase58(),
+        tickers,
+        signMessage,
+        controller.signal,
+        () => setStage("checking"),
       );
-      setCouponStatus("idle");
-    } catch {
-      setCouponStatus("error");
+      if (!controller.signal.aborted) setResult(issued);
+    } catch (e) {
+      if (!controller.signal.aborted)
+        setError(
+          e instanceof Error ? e.message : "No se pudo emitir el cupón.",
+        );
+    } finally {
+      requestRef.current = null;
+      if (!controller.signal.aborted) setStage("idle");
     }
   }
-
-  if (purchased) {
+  if (result)
     return (
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-8">
-        <Link href="/" className="text-xs text-zinc-500 underline">
-          ← Volver al dashboard
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-5 py-8">
+        <Link href="/" className="text-sm text-brand-300 underline">
+          ← Volver a la cartera
         </Link>
-        <div className="rounded-xl border border-solana-green/40 bg-solana-green/10 p-5 text-center">
-          <p className="text-lg font-semibold text-solana-green">
-            Compra confirmada (demo)
+        <h1 className="text-2xl font-bold">Posición acreditada</h1>
+        <p className="text-sm leading-relaxed text-zinc-300">
+          El servidor ha verificado tu firma, saldo y cotización. Estos son los
+          beneficios de ejemplo que te corresponden ahora.
+        </p>
+        <div className="rounded-xl border border-ink-line bg-ink-soft p-4">
+          <p className="text-sm text-zinc-300">
+            Total ilustrativo con beneficio verificado
           </p>
-          <p className="mt-2 text-sm text-zinc-400">
-            Total cobrado:{" "}
-            <span className="font-medium text-zinc-100">{usd(total)}</span>
+          <p className="mt-1 text-2xl font-bold text-ember-400">{usd(total)}</p>
+          <p className="mt-2 text-xs text-zinc-400">
+            No se ha cobrado ningún importe. La cotización al emitir puede
+            cambiar el beneficio estimado.
           </p>
         </div>
-
-        {couponStatus === "loading" && (
-          <p className="text-center text-xs text-zinc-500">Firmando cupón…</p>
-        )}
-        {couponStatus === "error" && (
-          <p className="text-center text-xs text-red-400">
-            No se pudo generar el cupón verificable.
-          </p>
-        )}
-        {couponToken && couponLines && (
-          <Coupon
-            verifyUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/verify?c=${couponToken}`}
-            lines={couponLines}
-          />
-        )}
-
+        <Coupon
+          verifyUrl={window.location.origin + "/verify?c=" + result.token}
+          lines={result.lines}
+        />
+        <p className="break-all text-xs text-zinc-400">
+          Wallet acreditada: {result.wallet}
+        </p>
         <button
           onClick={() => {
+            setResult(null);
             setCart({});
-            setPurchased(false);
-            setCouponToken(null);
-            setCouponLines(null);
           }}
-          className="self-center text-xs text-zinc-500 underline hover:text-zinc-300"
+          className="rounded-xl border border-brand-300 px-4 py-3 text-sm text-brand-300"
         >
-          Hacer otra compra
+          Volver a explorar
         </button>
-      </div>
+      </main>
     );
-  }
-
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-4 pb-32 pt-8">
-      <div className="flex items-center justify-between">
-        <Link href="/" className="text-xs text-zinc-500 underline">
-          ← Dashboard
-        </Link>
-        <span className="font-display text-lg font-bold tracking-tight text-zinc-50">
-          Marketplace
-        </span>
-      </div>
-
-      {!owner && (
-        <p className="text-xs text-ember-400">
-          Conecta una wallet en el dashboard para desbloquear tus descuentos.
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-7 px-5 pb-28 pt-8">
+      <Link href="/" className="text-sm text-brand-300 underline">
+        ← Volver a la cartera
+      </Link>
+      <header>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-teal-300">
+          Marketplace · Demostración
+        </p>
+        <h1 className="text-3xl font-bold">Una cartera con ventajas.</h1>
+        <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+          Explora campañas de ejemplo para cada activo. Los productos son
+          genéricos: no son ofertas oficiales ni acuerdos con estas empresas.
+        </p>
+      </header>
+      {!ownWallet && (
+        <p
+          role="status"
+          className="rounded-xl border border-ink-line bg-ink-soft p-4 text-sm text-zinc-300"
+        >
+          {peeked
+            ? "Estás consultando una dirección pública. Vuelve a tu wallet conectada para acreditar una posición propia."
+            : "Conecta tu wallet desde la cartera para solicitar un cupón de demostración."}
         </p>
       )}
-
+      {ownWallet && !signMessage && (
+        <p role="alert" className="text-sm text-red-300">
+          Tu wallet no permite firmar mensajes. Utiliza una wallet compatible,
+          como Phantom.
+        </p>
+      )}
+      {owner && (holdingsStatus === "error" || priceStatus === "error") && (
+        <p role="alert" className="text-sm text-red-300">
+          No se pudieron verificar los datos. La emisión está desactivada;
+          volveremos a comprobarlos automáticamente.
+        </p>
+      )}
       {SUPPORTED_ASSETS.map((asset) => {
-        const position = positionByTicker.get(asset.ticker);
-        const tier = position?.tierResult?.tier;
-        const held = (position?.uiAmount ?? 0) > 0;
-        const products = PRODUCTS.filter((p) => p.ticker === asset.ticker);
-
+        const position = positions.find((p) => p.asset.ticker === asset.ticker);
+        const pct = position?.tierResult?.tier?.discountPct ?? 0;
         return (
-          <section key={asset.ticker} className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <TokenIcon logoUrl={asset.logoUrl} ticker={asset.ticker} size={40} />
-                <div>
-                  <p className="text-sm font-semibold text-zinc-100">
-                    {asset.company}{" "}
-                    <span className="font-normal text-zinc-500">
-                      · {asset.ticker}
-                    </span>
-                  </p>
-                  <p className="text-xs text-zinc-500">{asset.companyTagline}</p>
-                </div>
+          <section
+            key={asset.ticker}
+            aria-label={"Campaña para " + asset.ticker}
+            className="border-t border-ink-line pt-5"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <TokenIcon
+                logoUrl={asset.logoUrl}
+                ticker={asset.ticker}
+                size={40}
+              />
+              <div className="flex-1">
+                <h2 className="font-semibold">
+                  {asset.company}{" "}
+                  <span className="text-xs font-normal text-zinc-400">
+                    · {asset.ticker}
+                  </span>
+                </h2>
+                <p className="text-xs text-zinc-400">
+                  Campaña de ejemplo para titulares
+                </p>
               </div>
-              <span
-                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                  tier
-                    ? "bg-teal-500/15 text-teal-300"
-                    : "bg-ink-line text-zinc-500"
-                }`}
-              >
-                {tier
-                  ? `${tier.discountPct}% dto.`
-                  : held
-                    ? "Sin tier todavía"
-                    : `Holder de ${asset.ticker}`}
+              <span className="text-sm font-semibold text-teal-300">
+                {position?.usdValue == null ? "—" : pct + "% demo"}
               </span>
             </div>
-
             <div className="flex flex-col gap-2">
-              {products.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-ink-line bg-ink-soft p-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-zinc-100">
-                      {product.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">{product.blurb}</p>
-                    <p className="mt-1 text-sm text-zinc-300">
-                      {usd(product.priceUsd)}
-                    </p>
+              {PRODUCTS.filter((p) => p.ticker === asset.ticker).map(
+                (product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-ink-soft p-4"
+                  >
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-medium">{product.name}</h3>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        {product.blurb}
+                      </p>
+                      <p className="mt-2 text-sm text-zinc-200">
+                        {usd(product.priceUsd)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        disabled={stage !== "idle" || !cart[product.id]}
+                        aria-label={"Quitar " + product.name}
+                        onClick={() => change(product.id, -1)}
+                        className="h-11 w-9 rounded-lg border border-ink-line"
+                      >
+                        −
+                      </button>
+                      <span
+                        aria-label={"Cantidad de " + product.name}
+                        className="w-5 text-center text-sm"
+                      >
+                        {cart[product.id] ?? 0}
+                      </span>
+                      <button
+                        disabled={stage !== "idle" || cart[product.id] >= 99}
+                        aria-label={"Añadir " + product.name}
+                        onClick={() => change(product.id, 1)}
+                        className="h-11 w-9 rounded-lg border border-brand-300 text-brand-300"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {(cart[product.id] ?? 0) > 0 && (
-                      <>
-                        <button
-                          onClick={() => removeFromCart(product.id)}
-                          className="h-7 w-7 rounded-full border border-zinc-700 text-zinc-300 hover:bg-ink-line"
-                        >
-                          −
-                        </button>
-                        <span className="w-4 text-center text-sm">
-                          {cart[product.id]}
-                        </span>
-                      </>
-                    )}
-                    <button
-                      onClick={() => addToCart(product.id)}
-                      className="h-7 w-7 rounded-full border border-brand-600 text-brand-300 hover:bg-brand-600/10"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           </section>
         );
       })}
-
       {items.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-md border-t border-ink-line bg-ink p-4">
-          <div className="flex justify-between text-sm text-zinc-400">
+        <section
+          id="demo-summary"
+          aria-label="Resumen de demostración"
+          className="rounded-xl border border-brand-600 bg-ink-soft p-5"
+        >
+          <h2 className="mb-4 font-semibold">Tu ejemplo de compra</h2>
+          <div className="flex justify-between text-sm text-zinc-300">
             <span>Subtotal</span>
             <span>{usd(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-sm text-solana-green">
-            <span>Descuento total</span>
-            <span>−{usd(discount)}</span>
+          <div className="mt-2 flex justify-between text-sm text-teal-300">
+            <span>Beneficio estimado</span>
+            <span>
+              {ready ? "−" + usd(subtotal - total) : "Pendiente de verificar"}
+            </span>
           </div>
-          <div className="mt-2 flex justify-between border-t border-ink-line pt-2 text-base font-semibold text-zinc-50">
-            <span>Total</span>
-            <span>{usd(total)}</span>
+          <div className="mt-3 flex justify-between border-t border-ink-line pt-3 font-semibold">
+            <span>Total ilustrativo</span>
+            <span>{ready ? usd(total) : "—"}</span>
           </div>
           <button
-            onClick={handleConfirm}
-            className="mt-4 w-full rounded-lg bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-500"
+            onClick={confirm}
+            disabled={!canIssue}
+            className="mt-5 w-full rounded-xl bg-brand-600 px-3 py-3.5 text-sm font-semibold text-white hover:bg-brand-500"
           >
-            Confirmar compra (demo)
+            {stage === "signing"
+              ? "Confirma el mensaje en tu wallet…"
+              : stage === "checking"
+                ? "Verificando saldo y cotización…"
+                : "Firmar mensaje y generar cupón demo"}
           </button>
+          <p className="mt-3 text-xs leading-relaxed text-zinc-300">
+            No es una transacción. No se moverán fondos. El descuento definitivo
+            se calcula al emitir.
+          </p>
+          {ownWallet && !ready && stage === "idle" && (
+            <p role="status" className="mt-3 text-xs text-zinc-300">
+              Esperando saldos y precios recientes de los activos seleccionados.
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+        </section>
+      )}
+      <Link href="/example" className="text-sm text-brand-300 underline">
+        Ver ejemplo ilustrativo sin firmar
+      </Link>
+      {items.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-lg border-t border-ink-line bg-ink p-4">
+          <a
+            href="#demo-summary"
+            className="block rounded-xl bg-brand-600 px-4 py-3 text-center text-sm font-semibold"
+          >
+            Ver resumen · {itemCount} {itemCount === 1 ? "producto" : "productos"}
+          </a>
         </div>
       )}
-    </div>
+    </main>
   );
 }

@@ -30,14 +30,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SolanaProviders>
           <div className="flex flex-1 flex-col">{children}</div>
         </SolanaProviders>
-        <footer className="border-t border-ink-line px-4 py-4 text-center text-[11px] leading-relaxed text-zinc-500">
-          Demo de hackathon. Las acciones tokenizadas (xStocks/Ondo)
-          representan exposición económica a la empresa correspondiente, no
-          derechos de accionista. MIOS no está afiliado, patrocinado ni
-          respaldado por Apple, NVIDIA, Tesla, Alphabet ni S&amp;P Dow Jones
-          Indices — los logotipos solo identifican el activo tokenizado. La
-          tienda es un concepto de demo, no un comercio oficial de esas
-          marcas. No es asesoramiento financiero.
+        <footer className="mx-auto w-full max-w-2xl border-t border-ink-line px-5 pb-28 pt-6 text-center text-xs leading-relaxed text-zinc-400">
+          Demo de hackathon. Las acciones tokenizadas (xStocks/Ondo) representan
+          exposición económica a la empresa correspondiente, no derechos de
+          accionista. MIOS no está afiliado, patrocinado ni respaldado por
+          Apple, NVIDIA, Tesla, Alphabet ni S&amp;P Dow Jones Indices — los
+          logotipos solo identifican el activo tokenizado. La tienda es un
+          concepto de demo, no un comercio oficial de esas marcas. Los
+          beneficios y cupones son de demostración, sin pago ni canje comercial.
+          No es asesoramiento financiero.
         </footer>
       </body>
     </html>

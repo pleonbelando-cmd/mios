@@ -39,7 +39,12 @@ function withPrefix(id: string): string {
   return id.startsWith("0x") ? id : `0x${id}`;
 }
 
-function toPriceReading({ price, conf, expo, publish_time }: ParsedPriceUpdate["price"]): PriceReading {
+function toPriceReading({
+  price,
+  conf,
+  expo,
+  publish_time,
+}: ParsedPriceUpdate["price"]): PriceReading {
   const scale = 10 ** expo;
   const publishTimeMs = publish_time * 1000;
   return {
@@ -55,14 +60,18 @@ function toPriceReading({ price, conf, expo, publish_time }: ParsedPriceUpdate["
  * cliente (la clave se filtraría al bundle).
  */
 export async function getLatestPrices(
-  feedIds: string[]
+  feedIds: string[],
 ): Promise<Record<string, PriceReading>> {
   const accessToken = process.env.PYTH_API_KEY;
   if (!accessToken) {
     throw new Error("PYTH_API_KEY no configurada en .env.local");
   }
 
-  const client = new HermesClient(HERMES_PRICE_ENDPOINT, { accessToken });
+  const client = new HermesClient(HERMES_PRICE_ENDPOINT, {
+    accessToken,
+    timeout: 8000,
+    httpRetries: 0,
+  });
   const updates = await client.getLatestPriceUpdates(feedIds, { parsed: true });
 
   const result: Record<string, PriceReading> = {};
@@ -79,17 +88,26 @@ export type MarketHours = {
 };
 
 /** Sin API key: endpoint de metadatos público de Pyth. */
-export async function getMarketHours(symbol: string): Promise<MarketHours | null> {
+export async function getMarketHours(
+  symbol: string,
+): Promise<MarketHours | null> {
   const url = `${HERMES_METADATA_ENDPOINT}?query=${encodeURIComponent(symbol)}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(8000),
+  });
   if (!res.ok) return null;
 
   const feeds = (await res.json()) as Array<{
     attributes?: { symbol?: string };
-    market_hours?: { is_open: boolean; next_open: number | null; next_close: number | null };
+    market_hours?: {
+      is_open: boolean;
+      next_open: number | null;
+      next_close: number | null;
+    };
   }>;
 
-  const match = feeds.find((feed) => feed.attributes?.symbol === symbol) ?? feeds[0];
+  const match = feeds.find((feed) => feed.attributes?.symbol === symbol);
   if (!match?.market_hours) return null;
 
   return {
